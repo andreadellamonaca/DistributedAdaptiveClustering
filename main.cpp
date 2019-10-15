@@ -267,8 +267,8 @@ int main(int argc, char **argv) {
 
     auto gengraphend = chrono::steady_clock::now();
     if (!outputOnFile) {
-        cout << "Time (ms) required to generate the random graph: " <<
-        chrono::duration_cast<chrono::milliseconds>(gengraphend - gengraphstart).count() << endl;
+        cout << "Time (s) required to generate the random graph: " <<
+        chrono::duration_cast<chrono::nanoseconds>(gengraphend - gengraphstart).count()*1e-9 << endl;
     }
 
     // determine minimum and maximum vertex degree for the graph
@@ -303,7 +303,7 @@ int main(int argc, char **argv) {
 
     auto std_start = chrono::steady_clock::now();
 
-    //auto *avgsummaries = (AVG_SUMMARY*) calloc(params.peers, sizeof(AVG_SUMMARY));
+    //Local Average
     double **avgsummaries, *avg_storage;
     avg_storage = (double *) malloc(params.peers * n_dims * sizeof(double));
     fill_n(avg_storage, params.peers * n_dims, 0);
@@ -317,7 +317,7 @@ int main(int argc, char **argv) {
         if (peerID == 0) {
             int pts_count = peerLastItem[0] + 1;
             double weight = 1 / (double) pts_count;
-            for (int i = 0; i < peerLastItem[0] + 1; ++i) {
+            for (int i = 0; i < peerLastItem[peerID]; ++i) {
                 for (int j = 0; j < n_dims; ++j) {
                     avgsummaries[peerID][j] += weight * data[i][j];
                 }
@@ -330,18 +330,20 @@ int main(int argc, char **argv) {
                     avgsummaries[peerID][j] += weight * data[i][j];
                 }
             }
+            if (peerID == params.peers-1) {
+                for (int j = 0; j < n_dims; ++j) {
+                    avgsummaries[peerID][j] += weight * data[peerLastItem[peerID]][j];
+                }
+            }
         }
     }
 
     while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
-
         memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
-
         for(int peerID = 0; peerID < params.peers; peerID++){
             // check peer convergence
             if(params.roundsToExecute < 0 && converged[peerID])
                 continue;
-
             // determine peer neighbors
             igraph_vector_t neighbors;
             igraph_vector_init(&neighbors, 0);
@@ -363,26 +365,18 @@ int main(int argc, char **argv) {
                     avgsummaries[peerID][j] = (avgsummaries[peerID][j] + avgsummaries[neighborID][j]) / 2;
                 }
                 memcpy(avgsummaries[neighborID], avgsummaries[peerID], n_dims * sizeof(double));
-                //double weight = 1/((double) neighborsSize+1);
-                //avgsummaries[peerID].sum += (weight/2) * (avgsummaries[neighborID].sum - avgsummaries[peerID].sum);
-
                 double mean = (dimestimate[peerID] + dimestimate[neighborID]) / 2;
                 dimestimate[peerID] = mean;
                 dimestimate[neighborID] = mean;
-
             }
-
             igraph_vector_destroy(&neighbors);
-
         }
 
         // check local convergence
         if (params.roundsToExecute < 0) {
             for(int peerID = 0; peerID < params.peers; peerID++){
-
                 if(converged[peerID])
                     continue;
-
                 bool dimestimateconv;
                 if(prevestimate[peerID])
                     dimestimateconv = fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) < params.convThreshold;
@@ -394,23 +388,17 @@ int main(int argc, char **argv) {
                 else
                     convRounds[peerID] = 0;
 
-                //printf ("PeerID %d, round %d, convRound %d\n", peerID, rounds, convRounds[peerID]);
-
-
                 converged[peerID] = (convRounds[peerID] >= params.convLimit);
                 if(converged[peerID]){
-                    //printf("peer %d rounds before convergence: %d\n", peerID, rounds + 1);
                     Numberofconverged --;
                 }
             }
         }
-
         rounds++;
-        cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
-
+        //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
         params.roundsToExecute--;
     }
-
+/*
     for(int peerID = 0; peerID < params.peers; peerID++){
         cout << peerID << ": ";
         for (int i = 0; i < n_dims; ++i) {
@@ -418,12 +406,207 @@ int main(int argc, char **argv) {
         }
         cout << endl;
     }
+*/
+    for(int peerID = 0; peerID < params.peers; peerID++){
+        if (peerID == 0) {
+            for (int i = 0; i < peerLastItem[peerID]; ++i) {
+                for (int j = 0; j < n_dims; ++j) {
+                    data[i][j] -= avgsummaries[peerID][j];
+                }
+            }
+        } else {
+            for (int i = peerLastItem[peerID-1]; i < peerLastItem[peerID]; ++i) {
+                for (int j = 0; j < n_dims; ++j) {
+                    data[i][j] -= avgsummaries[peerID][j];
+                }
+            }
+            if (peerID == params.peers-1) {
+                for (int j = 0; j < n_dims; ++j) {
+                    data[peerLastItem[peerID]][j] -= avgsummaries[peerID][j];
+                }
+            }
+        }
+    }
+    free(avgsummaries);
+    free(avg_storage);
 
     auto std_end = chrono::steady_clock::now();
     if (!outputOnFile) {
-        cout << "Time (ms) required to standardize the dataset: " <<
-             chrono::duration_cast<chrono::milliseconds>(std_end - std_start).count() << endl;
+        cout << "Time (s) required to standardize the dataset: " <<
+             chrono::duration_cast<chrono::nanoseconds>(std_end - std_start).count()*1e-9 << endl;
     }
+
+    auto pcc_start = chrono::steady_clock::now();
+
+    double *pcc_storage, **pcc_i, ***pcc;
+    pcc_storage = (double *) malloc(params.peers * n_dims * n_dims * sizeof(double));
+    if (pcc_storage == nullptr) {
+        cout << "Malloc error on pcc_storage" << endl;
+        exit(-1);
+    }
+    fill_n(pcc_storage, params.peers * n_dims * n_dims, 0);
+    pcc_i = (double **) malloc(params.peers * n_dims * sizeof(double *));
+    if (pcc_i == nullptr) {
+        cout << "Malloc error on pcc_i" << endl;
+        exit(-1);
+    }
+    pcc = (double ***) malloc(params.peers * sizeof(double **));
+    if (pcc == nullptr) {
+        cout << "Malloc error on pcc" << endl;
+        exit(-1);
+    }
+
+    for (int i = 0; i < params.peers * n_dims; ++i) {
+        pcc_i[i] = &pcc_storage[i * n_dims];
+    }
+    for (int i = 0; i < params.peers; ++i) {
+        pcc[i] = &pcc_i[i * n_dims];
+    }
+
+    double **squaresum_dims, *squaresum_dims_storage;
+    squaresum_dims_storage = (double *) malloc(params.peers * n_dims * sizeof(double));
+    fill_n(squaresum_dims_storage, params.peers * n_dims, 0);
+    squaresum_dims = (double **) malloc(params.peers * sizeof(double *));
+
+    for (int i = 0; i < params.peers; ++i) {
+        squaresum_dims[i] = &squaresum_dims_storage[i * n_dims];
+    }
+
+    for(int peerID = 0; peerID < params.peers; peerID++){
+        for (int l = 0; l < n_dims; ++l) {
+            pcc[peerID][l][l] = 1;
+            if (peerID == 0) {
+                for (int i = 0; i < peerLastItem[peerID]; ++i) {
+                    squaresum_dims[peerID][l] += pow(data[i][l], 2);
+                }
+            } else {
+                for (int i = peerLastItem[peerID-1]; i < peerLastItem[peerID]; ++i) {
+                    squaresum_dims[peerID][l] += pow(data[i][l], 2);
+                }
+                if (peerID == params.peers-1) {
+                    squaresum_dims[peerID][l] += pow(data[peerLastItem[peerID]][l], 2);
+                }
+            }
+            for (int m = l + 1; m < n_dims; ++m) {
+                if (peerID == 0) {
+                    for (int i = 0; i < peerLastItem[peerID]; ++i) {
+                        pcc[peerID][l][m] += data[i][l] * data[i][m];
+                    }
+                } else {
+                    for (int i = peerLastItem[peerID-1]; i < peerLastItem[peerID]; ++i) {
+                        pcc[peerID][l][m] += data[i][l] * data[i][m];
+                    }
+                    if (peerID == params.peers-1) {
+                        pcc[peerID][l][m] += data[peerLastItem[peerID]][l] * data[peerLastItem[peerID]][m];
+                    }
+                }
+                //pcc[peerID][m][l] = pcc[peerID][l][m];
+            }
+        }
+    }
+
+    // Reset parameters for convergence estimate
+    fill_n(dimestimate, params.peers, 0);
+    dimestimate[0] = 1;
+    Numberofconverged = params.peers;
+    fill_n(converged, params.peers, false);
+    fill_n(convRounds, params.peers, 0);
+    rounds = 0;
+
+    while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
+        memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
+        for(int peerID = 0; peerID < params.peers; peerID++){
+            // check peer convergence
+            if(params.roundsToExecute < 0 && converged[peerID])
+                continue;
+            // determine peer neighbors
+            igraph_vector_t neighbors;
+            igraph_vector_init(&neighbors, 0);
+            igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
+            long neighborsSize = igraph_vector_size(&neighbors);
+            if(fanOut < neighborsSize){
+                // randomly sample f adjacent vertices
+                igraph_vector_shuffle(&neighbors);
+                igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize-1);
+            }
+
+            neighborsSize = igraph_vector_size(&neighbors);
+            for(int i = 0; i < neighborsSize; i++){
+                int neighborID = (int) VECTOR(neighbors)[i];
+                igraph_integer_t edgeID;
+                igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
+
+                for (int l = 0; l < n_dims; ++l) {
+                    squaresum_dims[peerID][l] = (squaresum_dims[peerID][l] + squaresum_dims[neighborID][l]) / 2;
+                    for (int m = l + 1; m < n_dims; ++m) {
+                        pcc[peerID][l][m] = (pcc[peerID][l][m] + pcc[neighborID][l][m]) / 2;
+                        //pcc[peerID][m][l] = pcc[peerID][l][m];
+                    }
+                }
+                memcpy(squaresum_dims[neighborID], squaresum_dims[peerID], n_dims * sizeof(double));
+                memcpy(pcc[neighborID][0], pcc[peerID][0], n_dims * n_dims * sizeof(double));
+                double mean = (dimestimate[peerID] + dimestimate[neighborID]) / 2;
+                dimestimate[peerID] = mean;
+                dimestimate[neighborID] = mean;
+            }
+            igraph_vector_destroy(&neighbors);
+        }
+
+        // check local convergence
+        if (params.roundsToExecute < 0) {
+            for(int peerID = 0; peerID < params.peers; peerID++){
+                if(converged[peerID])
+                    continue;
+                bool dimestimateconv;
+                if(prevestimate[peerID])
+                    dimestimateconv = fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) < params.convThreshold;
+                else
+                    dimestimateconv = false;
+
+                if(dimestimateconv)
+                    convRounds[peerID]++;
+                else
+                    convRounds[peerID] = 0;
+
+                converged[peerID] = (convRounds[peerID] >= params.convLimit);
+                if(converged[peerID]){
+                    Numberofconverged --;
+                }
+            }
+        }
+        rounds++;
+        //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
+        params.roundsToExecute--;
+    }
+
+    for(int peerID = 0; peerID < params.peers; peerID++){
+        for (int l = 0; l < n_dims; ++l) {
+            for (int m = l + 1; m < n_dims; ++m) {
+                pcc[peerID][l][m] = pcc[peerID][l][m] / sqrt(squaresum_dims[peerID][l] * squaresum_dims[peerID][m]);
+                pcc[peerID][m][l] = pcc[peerID][l][m];
+            }
+        }
+    }
+
+    auto pcc_end = chrono::steady_clock::now();
+    if (!outputOnFile) {
+        cout << "Time (s) required to compute Pearson matrix: " <<
+             chrono::duration_cast<chrono::nanoseconds>(pcc_end - pcc_start).count()*1e-9 << endl;
+    }
+
+    auto pca_start = chrono::steady_clock::now();
+
+    for(int peerID = 0; peerID < params.peers; peerID++){
+
+    }
+
+
+    auto pca_end = chrono::steady_clock::now();
+    if (!outputOnFile) {
+        cout << "Time (s) required to generate the random graph: " <<
+             chrono::duration_cast<chrono::nanoseconds>(pca_end - pca_start).count()*1e-9 << endl;
+    }
+
 /*
     auto _start = chrono::steady_clock::now();
 
@@ -431,8 +614,8 @@ int main(int argc, char **argv) {
 
     auto _end = chrono::steady_clock::now();
     if (!outputOnFile) {
-        cout << "Time (ms) required to generate the random graph: " <<
-             chrono::duration_cast<chrono::milliseconds>(_end - _start).count() << endl;
+        cout << "Time (s) required to compute Pearson matrix: " <<
+             chrono::duration_cast<chrono::nanoseconds>(_end - _start).count()*1e-9 << endl;
     }
 
     auto _start = chrono::steady_clock::now();
@@ -441,8 +624,8 @@ int main(int argc, char **argv) {
 
     auto _end = chrono::steady_clock::now();
     if (!outputOnFile) {
-        cout << "Time (ms) required to generate the random graph: " <<
-             chrono::duration_cast<chrono::milliseconds>(_end - _start).count() << endl;
+        cout << "Time (s) required to compute Pearson matrix: " <<
+             chrono::duration_cast<chrono::nanoseconds>(_end - _start).count()*1e-9 << endl;
     }
 */
     return 0;
