@@ -594,20 +594,160 @@ int main(int argc, char **argv) {
              chrono::duration_cast<chrono::nanoseconds>(pcc_end - pcc_start).count()*1e-9 << endl;
     }
 
-    auto pca_start = chrono::steady_clock::now();
+    auto partition_start = chrono::steady_clock::now();
+
+    int *uncorr_vars, *corr_vars;
+    corr_vars = (int *) malloc(params.peers * sizeof(int));
+    uncorr_vars = (int *) malloc(params.peers * sizeof(int));
+
+    for(int peerID = 0; peerID < params.peers; peerID++) {
+        corr_vars[peerID] = 0;
+        uncorr_vars[peerID] = 0;
+        for (int i = 0; i < n_dims; ++i) {
+            double overall = 0.0;
+            for (int j = 0; j < n_dims; ++j) {
+                if (i != j) {
+                    overall += pcc[peerID][i][j];
+                }
+            }
+            if ((overall / n_dims) >= 0) {
+                corr_vars[peerID]++;
+            } else {
+                uncorr_vars[peerID]++;
+            }
+        }
+
+        if (peerID == 0) {
+            cout << "Correlated dimensions: " << corr_vars[peerID] << ", " << "Uncorrelated dimensions: "
+                 << uncorr_vars[peerID] << endl;
+            if (corr_vars[peerID] < 2) {
+                cerr << "Correlated dimensions must be more than 1 in order to apply PCA!" << endl;
+                exit(-1);
+            }
+            if (uncorr_vars[peerID] == 0) {
+                cerr << "There are no candidate subspaces!" << endl;
+                exit(-1);
+            }
+        }
+    }
+/*
+    int *uncorr_storage, **uncorr;
+    uncorr_storage = (int *) malloc(params.peers * uncorr_vars[0] * sizeof(int));
+    if (pcc_storage == nullptr) {
+        cout << "Malloc error on uncorr_storage" << endl;
+        exit(-1);
+    }
+    uncorr = (int **) (malloc(params.peers * sizeof(int *)));
+    if (uncorr == nullptr) {
+        cout << "Malloc error on corr or uncorr" << endl;
+        exit(-1);
+    }
+    for (int i = 0; i < params.peers; ++i) {
+        uncorr[i] = &uncorr_storage[i * uncorr_vars[0]];
+    }
 
     for(int peerID = 0; peerID < params.peers; peerID++){
+        int npts = 0;
+        if (peerID == 0) {
+            npts = peerLastItem[peerID] + 1;
+        } else {
+            npts = peerLastItem[peerID] - peerLastItem[peerID-1];
+            if (peerID == params.peers-1) {
+                npts++;
+            }
+        }
+        double *corr_storage, **corr;
+        corr_storage = (double *) malloc(npts * corr_vars[peerID] * sizeof(double));
+        if (corr_storage == nullptr) {
+            cout << "Malloc error on corr_storage" << endl;
+            exit(-1);
+        }
+        corr = (double **) malloc(corr_vars[peerID] * sizeof(double *));
+        if (corr == nullptr) {
+            cout << "Malloc error on corr" << endl;
+            exit(-1);
+        }
 
-    }
+        for (int i = 0; i < corr_vars[peerID]; ++i) {
+            corr[i] = &corr_storage[i * npts];
+        }
+
+        corr_vars[peerID] = 0, uncorr_vars[peerID] = 0;
+        for (int i = 0; i < n_dims; ++i) {
+            double overall = 0.0;
+            for (int j = 0; j < n_dims; ++j) {
+                if (i != j) {
+                    overall += pcc[peerID][i][j];
+                }
+            }
+            if ((overall/n_dims) >= 0) {
+                if (peerID == 0) {
+                    for (int k = 0; k < peerLastItem[peerID]; ++k) {
+                        corr[corr_vars[peerID]][k] = data[k][i];
+                    }
+                } else {
+                    for (int k = peerLastItem[peerID-1]; k < peerLastItem[peerID]; ++k) {
+                        corr[corr_vars[peerID]][k] = data[k][i];
+                    }
+                    if (peerID == params.peers-1) {
+                        corr[corr_vars[peerID]][peerLastItem[peerID]] = data[peerLastItem[peerID]][i];
+                    }
+                }
+                corr_vars[peerID]++;
+            } else {
+                uncorr[peerID][uncorr_vars[peerID]] = i;
+                uncorr_vars[peerID]++;
+            }
+        }
+        free(pcc);
+        free(pcc_i);
+        free(pcc_storage);
+        free(squaresum_dims);
+        free(squaresum_dims_storage);
+
+        auto partition_end = chrono::steady_clock::now();
+        if (!outputOnFile) {
+            cout << "Time (s) required to partition the dataset in CORR and UNCORR sets: " <<
+                 chrono::duration_cast<chrono::nanoseconds>(partition_end - partition_start).count()*1e-9 << endl;
+        }
+
+        auto pca_start = chrono::steady_clock::now();
+
+        //Define the structure to save PC1_corr and PC2_corr
+        double **newspace, *newspace_storage;
+        newspace_storage = (double *) malloc(npts * 2 * sizeof(double));
+        if (newspace_storage == nullptr) {
+            cout << "Malloc error on newspace_storage" << endl;
+            exit(-1);
+        }
+        newspace = (double **) malloc(2 * sizeof(double *));
+        if (newspace == nullptr) {
+            cout << "Malloc error on newspace" << endl;
+            exit(-1);
+        }
+        for (int i = 0; i < 2; ++i) {
+            newspace[i] = &newspace_storage[i*npts];
+        }
+        PCA_transform(corr, corr_vars[peerID], npts, newspace);
+
+        cout << "----------" << endl;
+        for (int k = 0; k < 2; ++k) {
+            for (int l = 0; l < npts; ++l) {
+                cout << newspace[k][l] << " ";
+            }
+            cout << endl;
+        }
+
+        auto pca_end = chrono::steady_clock::now();
+        if (!outputOnFile) {
+            cout << "Time (s) required to compute Principal Component Analysis on CORR set: " <<
+                 chrono::duration_cast<chrono::nanoseconds>(pca_end - pca_start).count()*1e-9 << endl;
+        }
+    }*/
 
 
-    auto pca_end = chrono::steady_clock::now();
-    if (!outputOnFile) {
-        cout << "Time (s) required to generate the random graph: " <<
-             chrono::duration_cast<chrono::nanoseconds>(pca_end - pca_start).count()*1e-9 << endl;
-    }
 
-/*
+    /*
     auto _start = chrono::steady_clock::now();
 
 
