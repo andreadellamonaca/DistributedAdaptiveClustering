@@ -13,6 +13,8 @@
   <component name="ChangeListManager">
     <list default="true" id="424560db-08e6-4a5b-8aff-21bd96c75824" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/adaptive_clustering.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/main.cpp" afterDir="false" />
     </list>
@@ -99,7 +101,10 @@
       <workItem from="1571128409311" duration="7797000" />
       <workItem from="1571164856163" duration="363000" />
       <workItem from="1571222214061" duration="2713000" />
-      <workItem from="1571238508363" duration="10781000" />
+      <workItem from="1571238508363" duration="11433000" />
+      <workItem from="1571386829832" duration="6400000" />
+      <workItem from="1571479083262" duration="3687000" />
+      <workItem from="1571493900406" duration="10850000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -108,7 +113,14 @@
       <option name="project" value="LOCAL" />
       <updated>1571165174160</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Added CORR-UNCORR partitioning. TBM">
+      <created>1571251981615</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1571251981615</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -132,17 +144,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Added distributed Pearson Matrix computation." />
-    <option name="LAST_COMMIT_MESSAGE" value="Added distributed Pearson Matrix computation." />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
-          <url>file://$PROJECT_DIR$/main.cpp</url>
-          <line>740</line>
-          <option name="timeStamp" value="2" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
+    <MESSAGE value="Added CORR-UNCORR partitioning. TBM" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added CORR-UNCORR partitioning. TBM" />
   </component>
 </project>

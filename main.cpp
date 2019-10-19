@@ -500,7 +500,6 @@ int main(int argc, char **argv) {
                         pcc[peerID][l][m] += data[peerLastItem[peerID]][l] * data[peerLastItem[peerID]][m];
                     }
                 }
-                //pcc[peerID][m][l] = pcc[peerID][l][m];
             }
         }
     }
@@ -540,7 +539,6 @@ int main(int argc, char **argv) {
                     squaresum_dims[peerID][l] = (squaresum_dims[peerID][l] + squaresum_dims[neighborID][l]) / 2;
                     for (int m = l + 1; m < n_dims; ++m) {
                         pcc[peerID][l][m] = (pcc[peerID][l][m] + pcc[neighborID][l][m]) / 2;
-                        //pcc[peerID][m][l] = pcc[peerID][l][m];
                     }
                 }
                 memcpy(squaresum_dims[neighborID], squaresum_dims[peerID], n_dims * sizeof(double));
@@ -587,6 +585,8 @@ int main(int argc, char **argv) {
             }
         }
     }
+    free(squaresum_dims);
+    free(squaresum_dims_storage);
 
     auto pcc_end = chrono::steady_clock::now();
     if (!outputOnFile) {
@@ -630,7 +630,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-/*
+
     int *uncorr_storage, **uncorr;
     uncorr_storage = (int *) malloc(params.peers * uncorr_vars[0] * sizeof(int));
     if (pcc_storage == nullptr) {
@@ -645,31 +645,34 @@ int main(int argc, char **argv) {
     for (int i = 0; i < params.peers; ++i) {
         uncorr[i] = &uncorr_storage[i * uncorr_vars[0]];
     }
+    double ***corr;
+    corr = (double ***) malloc(params.peers * sizeof(double **));
+    if (corr == nullptr) {
+        cout << "Malloc error on corr" << endl;
+        exit(-1);
+    }
 
     for(int peerID = 0; peerID < params.peers; peerID++){
         int npts = 0;
         if (peerID == 0) {
-            npts = peerLastItem[peerID] + 1;
+            npts = peerLastItem[peerID];
         } else {
             npts = peerLastItem[peerID] - peerLastItem[peerID-1];
             if (peerID == params.peers-1) {
                 npts++;
             }
         }
-        double *corr_storage, **corr;
-        corr_storage = (double *) malloc(npts * corr_vars[peerID] * sizeof(double));
-        if (corr_storage == nullptr) {
-            cout << "Malloc error on corr_storage" << endl;
+        corr[peerID] = (double **) malloc(corr_vars[peerID] * sizeof(double *));
+        if (corr[peerID] == nullptr) {
+            cout << "Malloc error on corr for peer " << peerID << endl;
             exit(-1);
         }
-        corr = (double **) malloc(corr_vars[peerID] * sizeof(double *));
-        if (corr == nullptr) {
-            cout << "Malloc error on corr" << endl;
-            exit(-1);
-        }
-
-        for (int i = 0; i < corr_vars[peerID]; ++i) {
-            corr[i] = &corr_storage[i * npts];
+        for (int k = 0; k < corr_vars[peerID]; ++k) {
+            corr[peerID][k] = (double *) malloc(npts * sizeof(double));
+            if (corr[peerID][k] == nullptr) {
+                cout << "Malloc error on corr for peer " << peerID << endl;
+                exit(-1);
+            }
         }
 
         corr_vars[peerID] = 0, uncorr_vars[peerID] = 0;
@@ -681,16 +684,19 @@ int main(int argc, char **argv) {
                 }
             }
             if ((overall/n_dims) >= 0) {
+                int elem = 0;
                 if (peerID == 0) {
                     for (int k = 0; k < peerLastItem[peerID]; ++k) {
-                        corr[corr_vars[peerID]][k] = data[k][i];
+                        corr[peerID][corr_vars[peerID]][elem] = data[k][i];
+                        elem++;
                     }
                 } else {
                     for (int k = peerLastItem[peerID-1]; k < peerLastItem[peerID]; ++k) {
-                        corr[corr_vars[peerID]][k] = data[k][i];
+                        corr[peerID][corr_vars[peerID]][elem] = data[k][i];
+                        elem++;
                     }
                     if (peerID == params.peers-1) {
-                        corr[corr_vars[peerID]][peerLastItem[peerID]] = data[peerLastItem[peerID]][i];
+                        corr[peerID][corr_vars[peerID]][elem] = data[peerLastItem[peerID]][i];
                     }
                 }
                 corr_vars[peerID]++;
@@ -699,53 +705,161 @@ int main(int argc, char **argv) {
                 uncorr_vars[peerID]++;
             }
         }
-        free(pcc);
-        free(pcc_i);
-        free(pcc_storage);
-        free(squaresum_dims);
-        free(squaresum_dims_storage);
+    }
+    free(pcc);
+    free(pcc_i);
+    free(pcc_storage);
 
-        auto partition_end = chrono::steady_clock::now();
-        if (!outputOnFile) {
-            cout << "Time (s) required to partition the dataset in CORR and UNCORR sets: " <<
-                 chrono::duration_cast<chrono::nanoseconds>(partition_end - partition_start).count()*1e-9 << endl;
-        }
+    auto partition_end = chrono::steady_clock::now();
+    if (!outputOnFile) {
+        cout << "Time (s) required to partition the dataset in CORR and UNCORR sets: " <<
+             chrono::duration_cast<chrono::nanoseconds>(partition_end - partition_start).count() * 1e-9 << endl;
+    }
 
-        auto pca_start = chrono::steady_clock::now();
+    auto pca_start = chrono::steady_clock::now();
 
-        //Define the structure to save PC1_corr and PC2_corr
-        double **newspace, *newspace_storage;
-        newspace_storage = (double *) malloc(npts * 2 * sizeof(double));
-        if (newspace_storage == nullptr) {
-            cout << "Malloc error on newspace_storage" << endl;
-            exit(-1);
-        }
-        newspace = (double **) malloc(2 * sizeof(double *));
-        if (newspace == nullptr) {
-            cout << "Malloc error on newspace" << endl;
-            exit(-1);
-        }
-        for (int i = 0; i < 2; ++i) {
-            newspace[i] = &newspace_storage[i*npts];
-        }
-        PCA_transform(corr, corr_vars[peerID], npts, newspace);
+    //Define the structure to save PC1_corr and PC2_corr
+    double *newspace_storage, **newspace_i, ***newspace;
+    newspace_storage = (double *) malloc(params.peers * corr_vars[0] * corr_vars[0] * sizeof(double));
+    if (newspace_storage == nullptr) {
+        cout << "Malloc error on newspace_storage" << endl;
+        exit(-1);
+    }
+    newspace_i = (double **) malloc(params.peers * corr_vars[0] * sizeof(double *));
+    if (newspace_i == nullptr) {
+        cout << "Malloc error on newspace_i" << endl;
+        exit(-1);
+    }
+    newspace = (double ***) malloc(params.peers * sizeof(double **));
+    if (newspace == nullptr) {
+        cout << "Malloc error on newspace" << endl;
+        exit(-1);
+    }
 
-        cout << "----------" << endl;
-        for (int k = 0; k < 2; ++k) {
-            for (int l = 0; l < npts; ++l) {
-                cout << newspace[k][l] << " ";
+    for (int i = 0; i < params.peers * corr_vars[0]; ++i) {
+        newspace_i[i] = &newspace_storage[i * corr_vars[0]];
+    }
+    for (int i = 0; i < params.peers; ++i) {
+        newspace[i] = &newspace_i[i * corr_vars[0]];
+    }
+
+    for(int peerID = 0; peerID < params.peers; peerID++){
+        int npts = 0;
+        if (peerID == 0) {
+            npts = peerLastItem[peerID];
+        } else {
+            npts = peerLastItem[peerID] - peerLastItem[peerID-1];
+            if (peerID == params.peers-1) {
+                npts++;
             }
-            cout << endl;
+        }
+        //PCA_transform(corr[peerID], corr_vars[peerID], npts, newspace[peerID]);
+        for (int i=0; i < corr_vars[peerID]; i++) {
+            for (int j=0;j<corr_vars[peerID];j++) {
+                newspace[peerID][i][j]=0;
+                for (int k=0;k<npts;k++) {
+                    newspace[peerID][i][j] += corr[peerID][i][k] * corr[peerID][j][k];
+                }
+                newspace[peerID][i][j] = newspace[peerID][i][j] / (npts - 1);
+            }
+        }
+    }
+
+    // Reset parameters for convergence estimate
+    fill_n(dimestimate, params.peers, 0);
+    dimestimate[0] = 1;
+    Numberofconverged = params.peers;
+    fill_n(converged, params.peers, false);
+    fill_n(convRounds, params.peers, 0);
+    rounds = 0;
+
+    while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
+        memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
+        for(int peerID = 0; peerID < params.peers; peerID++){
+            // check peer convergence
+            if(params.roundsToExecute < 0 && converged[peerID])
+                continue;
+            // determine peer neighbors
+            igraph_vector_t neighbors;
+            igraph_vector_init(&neighbors, 0);
+            igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
+            long neighborsSize = igraph_vector_size(&neighbors);
+            if(fanOut < neighborsSize){
+                // randomly sample f adjacent vertices
+                igraph_vector_shuffle(&neighbors);
+                igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize-1);
+            }
+
+            neighborsSize = igraph_vector_size(&neighbors);
+            for(int i = 0; i < neighborsSize; i++){
+                int neighborID = (int) VECTOR(neighbors)[i];
+                igraph_integer_t edgeID;
+                igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
+
+                for (int l = 0; l < corr_vars[peerID]; ++l) {
+                    for (int k = 0; k < corr_vars[peerID]; ++k) {
+                        newspace[peerID][l][k] = (newspace[peerID][l][k] + newspace[neighborID][l][k]) / 2;
+                    }
+                }
+                memcpy(newspace[neighborID][0], newspace[peerID][0], corr_vars[peerID] * corr_vars[peerID] * sizeof(double));
+                double mean = (dimestimate[peerID] + dimestimate[neighborID]) / 2;
+                dimestimate[peerID] = mean;
+                dimestimate[neighborID] = mean;
+            }
+            igraph_vector_destroy(&neighbors);
         }
 
-        auto pca_end = chrono::steady_clock::now();
-        if (!outputOnFile) {
-            cout << "Time (s) required to compute Principal Component Analysis on CORR set: " <<
-                 chrono::duration_cast<chrono::nanoseconds>(pca_end - pca_start).count()*1e-9 << endl;
+        // check local convergence
+        if (params.roundsToExecute < 0) {
+            for(int peerID = 0; peerID < params.peers; peerID++){
+                if(converged[peerID])
+                    continue;
+                bool dimestimateconv;
+                if(prevestimate[peerID])
+                    dimestimateconv = fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) < params.convThreshold;
+                else
+                    dimestimateconv = false;
+
+                if(dimestimateconv)
+                    convRounds[peerID]++;
+                else
+                    convRounds[peerID] = 0;
+
+                converged[peerID] = (convRounds[peerID] >= params.convLimit);
+                if(converged[peerID]){
+                    Numberofconverged --;
+                }
+            }
         }
-    }*/
+        rounds++;
+        //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
+        params.roundsToExecute--;
+    }
 
+    for(int peerID = 0; peerID < params.peers; peerID++) {
+        mat x(corr_vars[peerID], corr_vars[peerID]);
+        for (int i=0; i < corr_vars[peerID]; i++) {
+            for (int j=0;j<corr_vars[peerID];j++) {
+                x(i,j) = newspace[peerID][i][j];
+            }
+        }
+        cx_vec eigval;
+        cx_mat eigvec;
 
+        eig_gen(eigval, eigvec, x, "balance");
+        cout << peerID << endl;
+        cout << "eigval" << endl;
+        eigval.print();
+        cout << "eigvect" << endl;
+        eigvec.print();
+        //ei_gen results are ordered by magnitude. take the first and second
+    }
+
+    auto pca_end = chrono::steady_clock::now();
+    if (!outputOnFile) {
+        cout << "Time (s) required to compute Principal Component Analysis on CORR set: " <<
+             chrono::duration_cast<chrono::nanoseconds>(pca_end - pca_start).count()*1e-9 << endl;
+    }
 
     /*
     auto _start = chrono::steady_clock::now();

@@ -449,14 +449,14 @@ void PCA_transform(double **data_to_transform, int data_dim, int n_data, double 
 //        cout << "\n";
 //    }
 
-    for (int i=0; i < n_data; i++) {
-        for (int j=0;j<2;j++) {
-            new_space[j][i]=0;
-            for (int k=0;k<data_dim;k++) {
-                new_space[j][i] += dset[i][k] * basis[k][j];
-            }
-        }
-    }
+//    for (int i=0; i < n_data; i++) {
+//        for (int j=0;j<2;j++) {
+//            new_space[j][i]=0;
+//            for (int k=0;k<data_dim;k++) {
+//                new_space[j][i] += dset[i][k] * basis[k][j];
+//            }
+//        }
+//    }
 
 //    cout << "The resulting subspace: " << endl;
 //    for(int j = 0; j < 2; j++) {
@@ -465,6 +465,12 @@ void PCA_transform(double **data_to_transform, int data_dim, int n_data, double 
 //        }
 //        cout << "\n";
 //    }
+
+    for (int i=0; i < data_dim; i++) {
+        for (int j=0;j<2;j++) {
+            new_space[i][j] = basis[i][j];
+        }
+    }
 }
 
 int cluster_size(cluster_report rep, int cluster_id, int n_data) {
