@@ -836,29 +836,72 @@ int main(int argc, char **argv) {
         params.roundsToExecute--;
     }
 
+    double ***combine;
+    combine = (double ***) malloc(params.peers * sizeof(double **));
+    if (combine == nullptr) {
+        cout << "Malloc error on combine" << endl;
+        exit(-1);
+    }
+
     for(int peerID = 0; peerID < params.peers; peerID++) {
-        mat x(corr_vars[peerID], corr_vars[peerID]);
-        for (int i=0; i < corr_vars[peerID]; i++) {
-            for (int j=0;j<corr_vars[peerID];j++) {
-                x(i,j) = newspace[peerID][i][j];
+        int npts = 0;
+        if (peerID == 0) {
+            npts = peerLastItem[peerID];
+        } else {
+            npts = peerLastItem[peerID] - peerLastItem[peerID-1];
+            if (peerID == params.peers-1) {
+                npts++;
             }
         }
-        cx_vec eigval;
-        cx_mat eigvec;
 
-        eig_gen(eigval, eigvec, x, "balance");
-        cout << peerID << endl;
-        cout << "eigval" << endl;
-        eigval.print();
-        cout << "eigvect" << endl;
-        eigvec.print();
-        //ei_gen results are ordered by magnitude. take the first and second
+        combine[peerID] = (double **) malloc(3 * sizeof(double *));
+        if (combine[peerID] == nullptr) {
+            cout << "Malloc error on combine for peer " << peerID << endl;
+            exit(-1);
+        }
+        for (int k = 0; k < 3; ++k) {
+            combine[peerID][k] = (double *) malloc(npts * sizeof(double));
+            if (combine[peerID][k] == nullptr) {
+                cout << "Malloc error on combine for peer " << peerID << endl;
+                exit(-1);
+            }
+        }
+
+        mat cov_mat(newspace[peerID][0], corr_vars[peerID], corr_vars[peerID]);
+        vec eigval;
+        mat eigvec;
+        eig_sym(eigval, eigvec, cov_mat);
+
+        for (int i = 0; i < 2; ++i) {
+            for (int j = 0; j < npts; ++j) {
+                double value = 0.0;
+                for (int k = 0; k < corr_vars[peerID]; ++k) {
+                    int row = corr_vars[peerID] - i - 1;
+                    value += corr[peerID][k][j] * eigvec(row, k);
+                }
+                combine[peerID][i][j] = value;
+            }
+        }
     }
+    free(corr);
+    free(corr_vars);
+    free(newspace_storage);
+    free(newspace_i);
+    free(newspace);
 
     auto pca_end = chrono::steady_clock::now();
     if (!outputOnFile) {
         cout << "Time (s) required to compute Principal Component Analysis on CORR set: " <<
              chrono::duration_cast<chrono::nanoseconds>(pca_end - pca_start).count()*1e-9 << endl;
+    }
+
+    auto cs_start = chrono::steady_clock::now();
+    
+
+    auto cs_end = chrono::steady_clock::now();
+    if (!outputOnFile) {
+        cout << "Time (s) required to create candidate subspaces: " <<
+             chrono::duration_cast<chrono::nanoseconds>(cs_end - cs_start).count()*1e-9 << endl;
     }
 
     /*
