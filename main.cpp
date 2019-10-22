@@ -398,15 +398,7 @@ int main(int argc, char **argv) {
         //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
         params.roundsToExecute--;
     }
-/*
-    for(int peerID = 0; peerID < params.peers; peerID++){
-        cout << peerID << ": ";
-        for (int i = 0; i < n_dims; ++i) {
-            cout << avgsummaries[peerID][i] << ", ";
-        }
-        cout << endl;
-    }
-*/
+
     for(int peerID = 0; peerID < params.peers; peerID++){
         if (peerID == 0) {
             for (int i = 0; i < peerLastItem[peerID]; ++i) {
@@ -753,9 +745,9 @@ int main(int argc, char **argv) {
                 npts++;
             }
         }
-        //PCA_transform(corr[peerID], corr_vars[peerID], npts, newspace[peerID]);
+
         for (int i=0; i < corr_vars[peerID]; i++) {
-            for (int j=0;j<corr_vars[peerID];j++) {
+            for (int j=i;j<corr_vars[peerID];j++) {
                 newspace[peerID][i][j]=0;
                 for (int k=0;k<npts;k++) {
                     newspace[peerID][i][j] += corr[peerID][i][k] * corr[peerID][j][k];
@@ -797,8 +789,9 @@ int main(int argc, char **argv) {
                 igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
 
                 for (int l = 0; l < corr_vars[peerID]; ++l) {
-                    for (int k = 0; k < corr_vars[peerID]; ++k) {
+                    for (int k = l; k < corr_vars[peerID]; ++k) {
                         newspace[peerID][l][k] = (newspace[peerID][l][k] + newspace[neighborID][l][k]) / 2;
+                        newspace[peerID][k][l] = newspace[peerID][l][k];
                     }
                 }
                 memcpy(newspace[neighborID][0], newspace[peerID][0], corr_vars[peerID] * corr_vars[peerID] * sizeof(double));
@@ -876,8 +869,9 @@ int main(int argc, char **argv) {
             for (int j = 0; j < npts; ++j) {
                 double value = 0.0;
                 for (int k = 0; k < corr_vars[peerID]; ++k) {
-                    int row = corr_vars[peerID] - i - 1;
-                    value += corr[peerID][k][j] * eigvec(row, k);
+                    int col = corr_vars[peerID] - i - 1;
+                    double ewr = eigvec(k, col);
+                    value += corr[peerID][k][j] * eigvec(k, col);
                 }
                 combine[peerID][i][j] = value;
             }
@@ -896,12 +890,206 @@ int main(int argc, char **argv) {
     }
 
     auto cs_start = chrono::steady_clock::now();
-    
+
+    double ****subspace;
+    subspace = (double ****) malloc(params.peers * sizeof(double ***));
+    if (subspace == nullptr) {
+        cout << "Malloc error on subspace" << endl;
+        exit(-1);
+    }
+
+    for(int peerID = 0; peerID < params.peers; peerID++) {
+        subspace[peerID] = (double ***) malloc(uncorr_vars[peerID] * sizeof(double **));
+        int npts = 0;
+        if (peerID == 0) {
+            npts = peerLastItem[peerID];
+        } else {
+            npts = peerLastItem[peerID] - peerLastItem[peerID-1];
+            if (peerID == params.peers-1) {
+                npts++;
+            }
+        }
+        for (int m = 0; m < uncorr_vars[peerID]; ++m) {
+            subspace[peerID][m] = (double **) malloc(2 * sizeof(double *));
+            for (int k = 0; k < 2; ++k) {
+                subspace[peerID][m][k] = (double *) malloc(npts * sizeof(double ));
+            }
+        }
+    }
+
+    for (int m = 0; m < uncorr_vars[0]; ++m) {
+        double *covar_storage, **covar_i, ***covar;
+        covar_storage = (double *) malloc(params.peers * 3 * 3 * sizeof(double));
+        if (covar_storage == nullptr) {
+            cout << "Malloc error on covar_storage" << endl;
+            exit(-1);
+        }
+        covar_i = (double **) malloc(params.peers * 3 * sizeof(double *));
+        if (covar_i == nullptr) {
+            cout << "Malloc error on covar_i" << endl;
+            exit(-1);
+        }
+        covar = (double ***) malloc(params.peers * sizeof(double **));
+        if (covar == nullptr) {
+            cout << "Malloc error on covar" << endl;
+            exit(-1);
+        }
+
+        for (int j = 0; j < params.peers * 3; ++j) {
+            covar_i[j] = &covar_storage[j * 3];
+        }
+        for (int j = 0; j < params.peers; ++j) {
+            covar[j] = &covar_i[j * 3];
+        }
+
+        for(int peerID = 0; peerID < params.peers; peerID++) {
+            int npts = 0;
+            if (peerID == 0) {
+                npts = peerLastItem[peerID];
+            } else {
+                npts = peerLastItem[peerID] - peerLastItem[peerID-1];
+                if (peerID == params.peers-1) {
+                    npts++;
+                }
+            }
+            for (int j = 0; j < npts; ++j) {
+                if (peerID == 0) {
+                    combine[peerID][2][j] = data[j][uncorr[peerID][m]];
+                } else {
+                    int index = peerLastItem[peerID-1] + j;
+                    combine[peerID][2][j] = data[index][uncorr[peerID][m]];
+                }
+            }
+
+            for (int l=0; l < 3; l++) {
+                for (int j=l; j < 3;j++) {
+                    covar[peerID][l][j]=0;
+                    for (int k=0;k<npts;k++) {
+                        covar[peerID][l][j] += combine[peerID][l][k] * combine[peerID][j][k];
+                    }
+                    covar[peerID][l][j] = covar[peerID][l][j] / (npts - 1);
+                }
+            }
+        }
+
+        // Reset parameters for convergence estimate
+        fill_n(dimestimate, params.peers, 0);
+        dimestimate[0] = 1;
+        Numberofconverged = params.peers;
+        fill_n(converged, params.peers, false);
+        fill_n(convRounds, params.peers, 0);
+        rounds = 0;
+
+        while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
+            memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
+            for(int peerID = 0; peerID < params.peers; peerID++){
+                // check peer convergence
+                if(params.roundsToExecute < 0 && converged[peerID])
+                    continue;
+                // determine peer neighbors
+                igraph_vector_t neighbors;
+                igraph_vector_init(&neighbors, 0);
+                igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
+                long neighborsSize = igraph_vector_size(&neighbors);
+                if(fanOut < neighborsSize){
+                    // randomly sample f adjacent vertices
+                    igraph_vector_shuffle(&neighbors);
+                    igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize-1);
+                }
+
+                neighborsSize = igraph_vector_size(&neighbors);
+                for(int i = 0; i < neighborsSize; i++){
+                    int neighborID = (int) VECTOR(neighbors)[i];
+                    igraph_integer_t edgeID;
+                    igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
+
+                    for (int l = 0; l < 3; ++l) {
+                        for (int k = l; k < 3; ++k) {
+                            covar[peerID][l][k] = (covar[peerID][l][k] + covar[neighborID][l][k]) / 2;
+                            covar[peerID][k][l] = covar[peerID][l][k];
+                        }
+                    }
+                    memcpy(covar[neighborID][0], covar[peerID][0], 3 * 3 * sizeof(double));
+                    double mean = (dimestimate[peerID] + dimestimate[neighborID]) / 2;
+                    dimestimate[peerID] = mean;
+                    dimestimate[neighborID] = mean;
+                }
+                igraph_vector_destroy(&neighbors);
+            }
+
+            // check local convergence
+            if (params.roundsToExecute < 0) {
+                for(int peerID = 0; peerID < params.peers; peerID++){
+                    if(converged[peerID])
+                        continue;
+                    bool dimestimateconv;
+                    if(prevestimate[peerID])
+                        dimestimateconv = fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) < params.convThreshold;
+                    else
+                        dimestimateconv = false;
+
+                    if(dimestimateconv)
+                        convRounds[peerID]++;
+                    else
+                        convRounds[peerID] = 0;
+
+                    converged[peerID] = (convRounds[peerID] >= params.convLimit);
+                    if(converged[peerID]){
+                        Numberofconverged --;
+                    }
+                }
+            }
+            rounds++;
+            //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
+            params.roundsToExecute--;
+        }
+
+        for(int peerID = 0; peerID < params.peers; peerID++) {
+            mat cov_mat(covar[peerID][0], 3, 3);
+            vec eigval;
+            mat eigvec;
+            eig_sym(eigval, eigvec, cov_mat);
+
+            int npts = 0;
+            if (peerID == 0) {
+                npts = peerLastItem[peerID];
+            } else {
+                npts = peerLastItem[peerID] - peerLastItem[peerID-1];
+                if (peerID == params.peers-1) {
+                    npts++;
+                }
+            }
+
+            for (int i = 0; i < 2; ++i) {
+                for (int j = 0; j < npts; ++j) {
+                    double value = 0.0;
+                    for (int k = 0; k < 3; ++k) {
+                        int col = 3 - i - 1;
+                        value += combine[peerID][k][j] * eigvec(k, col);
+                    }
+                    subspace[peerID][m][i][j] = value;
+                }
+            }
+        }
+    }
+    free(combine);
 
     auto cs_end = chrono::steady_clock::now();
     if (!outputOnFile) {
         cout << "Time (s) required to create candidate subspaces: " <<
              chrono::duration_cast<chrono::nanoseconds>(cs_end - cs_start).count()*1e-9 << endl;
+    }
+
+    auto clustering_start = chrono::steady_clock::now();
+
+    for (int i = 0; i < uncorr_vars[0]; ++i) {
+
+    }
+
+    auto clustering_end = chrono::steady_clock::now();
+    if (!outputOnFile) {
+        cout << "Time (s) required to run K-Means: " <<
+             chrono::duration_cast<chrono::nanoseconds>(clustering_end - clustering_start).count()*1e-9 << endl;
     }
 
     /*
