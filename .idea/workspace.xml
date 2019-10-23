@@ -107,7 +107,9 @@
       <workItem from="1571567049329" duration="2896000" />
       <workItem from="1571645923929" duration="5430000" />
       <workItem from="1571670748508" duration="12158000" />
-      <workItem from="1571735192085" duration="5432000" />
+      <workItem from="1571735192085" duration="5522000" />
+      <workItem from="1571824688380" duration="5238000" />
+      <workItem from="1571842907286" duration="11437000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -137,7 +139,14 @@
       <option name="project" value="LOCAL" />
       <updated>1571658065821</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Created candidate subspaces.&#10;TODO: distributed kmeans clustering">
+      <created>1571744326230</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1571744326230</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -164,6 +173,23 @@
     <MESSAGE value="Added CORR-UNCORR partitioning. TBM" />
     <MESSAGE value="Applied Pca on CORR. TBM" />
     <MESSAGE value="Applied Pca on CORR.&#10;TODO: create candidate subspaces" />
-    <option name="LAST_COMMIT_MESSAGE" value="Applied Pca on CORR.&#10;TODO: create candidate subspaces" />
+    <MESSAGE value="Created candidate subspaces.&#10;TODO: distributed kmeans clustering" />
+    <option name="LAST_COMMIT_MESSAGE" value="Created candidate subspaces.&#10;TODO: distributed kmeans clustering" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/main.cpp</url>
+          <line>1238</line>
+          <option name="timeStamp" value="25" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+    <watches-manager>
+      <configuration name="CMakeRunConfiguration">
+        <watch expression="rounds" language="ObjectiveC" />
+      </configuration>
+    </watches-manager>
   </component>
 </project>

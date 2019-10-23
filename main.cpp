@@ -1083,7 +1083,168 @@ int main(int argc, char **argv) {
     auto clustering_start = chrono::steady_clock::now();
 
     for (int i = 0; i < uncorr_vars[0]; ++i) {
+        for (int j = 1; j <= 10/*K_MAX*/; ++j) {
+            mat final[params.peers];
+            for(int peerID = 0; peerID < params.peers; peerID++) {
+                int npts = 0;
+                if (peerID == 0) {
+                    npts = peerLastItem[peerID];
+                } else {
+                    npts = peerLastItem[peerID] - peerLastItem[peerID - 1];
+                    if (peerID == params.peers - 1) {
+                        npts++;
+                    }
+                }
+                mat dset(subspace[peerID][i][0], 2, npts);
+                bool status = kmeans(final[peerID], dset, j, random_subset, 1, false);
+                if (!status) {
+                    cout << "Error in KMeans run." << endl;
+                    exit(-1);
+                }
+                //cout << "first: " << peerID << " " << final[peerID].at(0, 0) << ", " << final[peerID].at(1, 0) << endl;
+            }
 
+            // Reset parameters for convergence estimate
+            Numberofconverged = params.peers;
+            fill_n(converged, params.peers, false);
+            fill_n(convRounds, params.peers, 0);
+            rounds = 0;
+
+            mat prev_kmeans[params.peers];
+
+            while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
+                //memcpy(prev_kmeans, final, sizeof(final));
+                for(int peerID = 0; peerID < params.peers; peerID++){
+                    prev_kmeans[peerID] = final[peerID];
+                    // check peer convergence
+                    if(params.roundsToExecute < 0 && converged[peerID])
+                        continue;
+
+                    // Reset parameters for convergence estimate
+                    fill_n(dimestimate, params.peers, 0);
+                    dimestimate[0] = 1;
+                    int N_converged = params.peers;
+                    bool *converged2 = (bool *) calloc(params.peers, sizeof(bool));
+                    fill_n(converged2, params.peers, false);
+
+                    int *convRounds2 = (int *) calloc(params.peers, sizeof(int));
+                    int rounds2 = 0;
+
+                    while( (params.roundsToExecute < 0 && N_converged) || params.roundsToExecute > 0){
+                        memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
+                        for(int peerID2 = 0; peerID2 < params.peers; peerID2++){
+                            // check peer convergence
+                            if(params.roundsToExecute < 0 && converged2[peerID2])
+                                continue;
+                            // determine peer neighbors
+                            igraph_vector_t neighbors;
+                            igraph_vector_init(&neighbors, 0);
+                            igraph_neighbors(&graph, &neighbors, peerID2, IGRAPH_ALL);
+                            long neighborsSize = igraph_vector_size(&neighbors);
+                            if(fanOut < neighborsSize){
+                                // randomly sample f adjacent vertices
+                                igraph_vector_shuffle(&neighbors);
+                                igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize-1);
+                            }
+
+                            neighborsSize = igraph_vector_size(&neighbors);
+                            for(int k = 0; k < neighborsSize; k++){
+                                int neighborID = (int) VECTOR(neighbors)[k];
+                                igraph_integer_t edgeID;
+                                igraph_get_eid(&graph, &edgeID, peerID2, neighborID, IGRAPH_UNDIRECTED, 1);
+
+                                for (int l = 0; l < j; ++l) {
+                                    final[peerID2].at(0, l) = (final[peerID2].at(0, l) + final[neighborID].at(0, l)) / 2;
+                                    final[peerID2].at(1, l) = (final[peerID2].at(1, l) + final[neighborID].at(1, l)) / 2;
+                                }
+                                memcpy(&final[neighborID], &final[peerID2], sizeof(final[peerID2]));
+                                double mean = (dimestimate[peerID2] + dimestimate[neighborID]) / 2;
+                                dimestimate[peerID2] = mean;
+                                dimestimate[neighborID] = mean;
+                            }
+                            igraph_vector_destroy(&neighbors);
+                        }
+
+                        // check local convergence
+                        if (params.roundsToExecute < 0) {
+                            for(int peerID2 = 0; peerID2 < params.peers; peerID2++){
+                                if(converged2[peerID2])
+                                    continue;
+                                bool dimestimateconv;
+                                if(prevestimate[peerID2])
+                                    dimestimateconv = fabs((prevestimate[peerID2] - dimestimate[peerID2]) / prevestimate[peerID2]) < params.convThreshold;
+                                else
+                                    dimestimateconv = false;
+
+                                if(dimestimateconv)
+                                    convRounds2[peerID2]++;
+                                else
+                                    convRounds2[peerID2] = 0;
+
+                                converged2[peerID2] = (convRounds2[peerID2] >= params.convLimit);
+                                if(converged2[peerID2]){
+                                    N_converged --;
+                                }
+                            }
+                        }
+                        rounds2++;
+                        //cerr << "\r Active peers: " << N_converged << " - Rounds: " << rounds2 << "          ";
+                        params.roundsToExecute--;
+                    }
+                }
+
+                for(int peerID = 0; peerID < params.peers; peerID++){
+                    //cout << "conv: " << peerID << " " << final[peerID].at(0, 0) << ", " << final[peerID].at(1, 0) << endl;
+                    int npts = 0;
+                    if (peerID == 0) {
+                        npts = peerLastItem[peerID];
+                    } else {
+                        npts = peerLastItem[peerID] - peerLastItem[peerID - 1];
+                        if (peerID == params.peers - 1) {
+                            npts++;
+                        }
+                    }
+                    mat dset(subspace[peerID][i][0], 2, npts);
+                    bool status = kmeans(final[peerID], dset, j, keep_existing, 1, false);
+                    if (!status) {
+                        cout << "Error in KMeans run." << endl;
+                        exit(-1);
+                    }
+
+                    //cout << "next: " << peerID << " " << final[peerID].at(0, 0) << ", " << final[peerID].at(1, 0) << endl;
+                }
+
+                // check local convergence
+                if (params.roundsToExecute < 0) {
+                    for(int peerID = 0; peerID < params.peers; peerID++){
+                        if(converged[peerID])
+                            continue;
+                        double error = 0.0;
+                        for (int l = 0; l < j; ++l) {
+                            for (int k = 0; k < 2; ++k) {
+                                error += final[peerID].at(k, l) - prev_kmeans[peerID].at(k, l);
+                            }
+                        }
+                        converged[peerID] = (fabs(error) == 0);
+
+                        if(converged[peerID]){
+                            Numberofconverged --;
+                        }
+                    }
+                }
+                rounds++;
+                //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
+                params.roundsToExecute--;
+            }
+            cout << j << endl;/*
+            for(int peerID = 0; peerID < params.peers; peerID++){
+                cout << peerID << ": ";
+                for (int l = 0; l < j; ++l) {
+                    cout << final[peerID].at(0, l) << ", " << final[peerID].at(1, l) << endl;
+                }
+            }
+            cout << endl;*/
+        }
     }
 
     auto clustering_end = chrono::steady_clock::now();
