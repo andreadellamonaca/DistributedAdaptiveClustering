@@ -13,6 +13,8 @@
   <component name="ChangeListManager">
     <list default="true" id="424560db-08e6-4a5b-8aff-21bd96c75824" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/adaptive_clustering.h" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/main.cpp" afterDir="false" />
@@ -38,6 +40,7 @@
   <component name="PropertiesComponent">
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="nodejs_package_manager_path" value="npm" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
@@ -109,7 +112,10 @@
       <workItem from="1571670748508" duration="12158000" />
       <workItem from="1571735192085" duration="5522000" />
       <workItem from="1571824688380" duration="5238000" />
-      <workItem from="1571842907286" duration="11437000" />
+      <workItem from="1571842907286" duration="11644000" />
+      <workItem from="1571929085455" duration="8549000" />
+      <workItem from="1571996678281" duration="6403000" />
+      <workItem from="1572019123855" duration="5570000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -146,7 +152,14 @@
       <option name="project" value="LOCAL" />
       <updated>1571744326230</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Implemente distributed kmeans clustering. TBM">
+      <created>1571858542620</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1571858542620</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -174,22 +187,18 @@
     <MESSAGE value="Applied Pca on CORR. TBM" />
     <MESSAGE value="Applied Pca on CORR.&#10;TODO: create candidate subspaces" />
     <MESSAGE value="Created candidate subspaces.&#10;TODO: distributed kmeans clustering" />
-    <option name="LAST_COMMIT_MESSAGE" value="Created candidate subspaces.&#10;TODO: distributed kmeans clustering" />
+    <MESSAGE value="Implemente distributed kmeans clustering. TBM" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implemente distributed kmeans clustering. TBM" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
           <url>file://$PROJECT_DIR$/main.cpp</url>
-          <line>1238</line>
-          <option name="timeStamp" value="25" />
+          <line>1329</line>
+          <option name="timeStamp" value="43" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
-    <watches-manager>
-      <configuration name="CMakeRunConfiguration">
-        <watch expression="rounds" language="ObjectiveC" />
-      </configuration>
-    </watches-manager>
   </component>
 </project>
