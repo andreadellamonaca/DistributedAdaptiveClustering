@@ -13,8 +13,6 @@
   <component name="ChangeListManager">
     <list default="true" id="424560db-08e6-4a5b-8aff-21bd96c75824" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/adaptive_clustering.h" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/main.cpp" afterDir="false" />
@@ -115,7 +113,9 @@
       <workItem from="1571842907286" duration="11644000" />
       <workItem from="1571929085455" duration="8549000" />
       <workItem from="1571996678281" duration="6403000" />
-      <workItem from="1572019123855" duration="5570000" />
+      <workItem from="1572019123855" duration="5782000" />
+      <workItem from="1572081530535" duration="6908000" />
+      <workItem from="1572108192971" duration="4596000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -159,7 +159,14 @@
       <option name="project" value="LOCAL" />
       <updated>1571858542620</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="Implemented distributed kmeans clustering.&#10;TODO: Distributed evaluation (elbow criterion)">
+      <created>1572030437719</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1572030437719</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -188,14 +195,15 @@
     <MESSAGE value="Applied Pca on CORR.&#10;TODO: create candidate subspaces" />
     <MESSAGE value="Created candidate subspaces.&#10;TODO: distributed kmeans clustering" />
     <MESSAGE value="Implemente distributed kmeans clustering. TBM" />
-    <option name="LAST_COMMIT_MESSAGE" value="Implemente distributed kmeans clustering. TBM" />
+    <MESSAGE value="Implemented distributed kmeans clustering.&#10;TODO: Distributed evaluation (elbow criterion)" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implemented distributed kmeans clustering.&#10;TODO: Distributed evaluation (elbow criterion)" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
           <url>file://$PROJECT_DIR$/main.cpp</url>
-          <line>1329</line>
+          <line>1478</line>
           <option name="timeStamp" value="43" />
         </line-breakpoint>
       </breakpoints>
