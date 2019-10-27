@@ -1087,6 +1087,7 @@ int main(int argc, char **argv) {
         cluster_report *prev = (cluster_report *) calloc(params.peers, sizeof(cluster_report));
         for (int j = 1; j <= K_MAX; ++j) {
             cube actual_centroids(2, j, params.peers);
+            actual_centroids.fill(0.0);
             cube prev_centroids(2, j, params.peers);
             for(int peerID = 0; peerID < params.peers; peerID++) {
                 int npts = 0;
@@ -1099,7 +1100,7 @@ int main(int argc, char **argv) {
                     }
                 }
                 mat dset(subspace[peerID][i][0], 2, npts);
-                bool status = kmeans(actual_centroids.slice(peerID), dset, j, random_subset, 1, false);
+                bool status = kmeans(actual_centroids.slice(peerID), dset, j, keep_existing, 1, false);
                 if (!status) {
                     cout << "Error in KMeans run." << endl;
                     exit(-1);
@@ -1114,6 +1115,29 @@ int main(int argc, char **argv) {
 
             while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
                 prev_centroids = actual_centroids;
+
+                for(int peerID = 0; peerID < params.peers; peerID++){
+                    // check peer convergence
+                    if(params.roundsToExecute < 0 && converged[peerID])
+                        continue;
+
+                    int npts = 0;
+                    if (peerID == 0) {
+                        npts = peerLastItem[peerID];
+                    } else {
+                        npts = peerLastItem[peerID] - peerLastItem[peerID - 1];
+                        if (peerID == params.peers - 1) {
+                            npts++;
+                        }
+                    }
+                    mat dset(subspace[peerID][i][0], 2, npts);
+                    bool status = kmeans(actual_centroids.slice(peerID), dset, j, keep_existing, 1, false);
+                    if (!status) {
+                        cout << "Error in KMeans run." << endl;
+                        exit(-1);
+                    }
+                }
+
                 // Reset parameters for convergence estimate
                 fill_n(dimestimate, params.peers, 0);
                 dimestimate[0] = 1;
@@ -1151,7 +1175,9 @@ int main(int argc, char **argv) {
                                 actual_centroids.at(0, l, peerID) = (actual_centroids.at(0, l, peerID) + actual_centroids.at(0, l, neighborID)) / 2;
                                 actual_centroids.at(1, l, peerID) = (actual_centroids.at(1, l, peerID) + actual_centroids.at(1, l, neighborID)) / 2;
                             }
-                            actual_centroids.slice(neighborID) = actual_centroids.slice(peerID);
+                            if(!converged[neighborID]) {
+                                actual_centroids.slice(neighborID) = actual_centroids.slice(peerID);
+                            }
                             double mean = (dimestimate[peerID] + dimestimate[neighborID]) / 2;
                             dimestimate[peerID] = mean;
                             dimestimate[neighborID] = mean;
@@ -1161,22 +1187,22 @@ int main(int argc, char **argv) {
 
                     // check local convergence
                     if (params.roundsToExecute < 0) {
-                        for(int peerID2 = 0; peerID2 < params.peers; peerID2++){
-                            if(converged2[peerID2])
+                        for(int peerID = 0; peerID < params.peers; peerID++){
+                            if(converged2[peerID])
                                 continue;
                             bool dimestimateconv;
-                            if(prevestimate[peerID2])
-                                dimestimateconv = fabs((prevestimate[peerID2] - dimestimate[peerID2]) / prevestimate[peerID2]) < params.convThreshold;
+                            if(prevestimate[peerID])
+                                dimestimateconv = fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) < params.convThreshold;
                             else
                                 dimestimateconv = false;
 
                             if(dimestimateconv)
-                                convRounds2[peerID2]++;
+                                convRounds2[peerID]++;
                             else
-                                convRounds2[peerID2] = 0;
+                                convRounds2[peerID] = 0;
 
-                            converged2[peerID2] = (convRounds2[peerID2] >= params.convLimit);
-                            if(converged2[peerID2]){
+                            converged2[peerID] = (convRounds2[peerID] >= params.convLimit);
+                            if(converged2[peerID]){
                                 N_converged --;
                             }
                         }
@@ -1185,40 +1211,23 @@ int main(int argc, char **argv) {
                     //cerr << "\r Active peers: " << N_converged << " - Rounds: " << rounds2 << "          ";
                     params.roundsToExecute--;
                 }
-                for(int peerID = 0; peerID < params.peers; peerID++){
-                    // check peer convergence
-                    if(params.roundsToExecute < 0 && converged[peerID])
-                        continue;
-
-                    int npts = 0;
-                    if (peerID == 0) {
-                        npts = peerLastItem[peerID];
-                    } else {
-                        npts = peerLastItem[peerID] - peerLastItem[peerID - 1];
-                        if (peerID == params.peers - 1) {
-                            npts++;
-                        }
-                    }
-                    mat dset(subspace[peerID][i][0], 2, npts);
-                    bool status = kmeans(actual_centroids.slice(peerID), dset, j, keep_existing, 1, false);
-                    if (!status) {
-                        cout << "Error in KMeans run." << endl;
-                        exit(-1);
-                    }
-                }
 
                 // check local convergence
                 if (params.roundsToExecute < 0) {
+                    double thconv = 0.001;
+                    if (rounds > 3000) {
+                        thconv = 1.50;
+                    }
                     for(int peerID = 0; peerID < params.peers; peerID++){
                         if(converged[peerID])
                             continue;
                         double error = 0.0;
                         for (int l = 0; l < j; ++l) {
                             for (int k = 0; k < 2; ++k) {
-                                error += abs(actual_centroids.at(k, l, peerID) - prev_centroids.at(k, l, peerID));
+                                error += fabs(actual_centroids.at(k, l, peerID) - prev_centroids.at(k, l, peerID));
                             }
                         }
-                        converged[peerID] = (error <= 0.0001);
+                        converged[peerID] = (error/j <= thconv/*0.001*/);
 
                         if(converged[peerID]){
                             Numberofconverged --;
@@ -1229,6 +1238,7 @@ int main(int argc, char **argv) {
                 //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
                 params.roundsToExecute--;
             }
+
             for(int peerID = 0; peerID < params.peers; peerID++){
                 int npts = 0;
                 if (peerID == 0) {
@@ -1253,6 +1263,15 @@ int main(int argc, char **argv) {
                     final[peerID].BetaCV = BetaCV(subspace[peerID][i], final[peerID], npts);
                 }
             }
+            cout << j << endl;
+            for (int peerID = 0; peerID < params.peers; peerID++) {
+                cout << peerID << ": ";
+                for (int m = 0; m < j; ++m) {
+                    cout << final[peerID].centroids.at(0, m) << ", " << final[peerID].centroids.at(1, m) << " - ";
+                }
+                cout << endl;
+            }
+                /*
             cout << j << endl;
 
             if (j > 1) {
@@ -1357,14 +1376,6 @@ int main(int argc, char **argv) {
                     rounds++;
                     //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
                     params.roundsToExecute--;
-                }
-                cout << j << endl;
-                for (int peerID = 0; peerID < params.peers; peerID++) {
-                    cout << peerID << ": ";
-                    for (int m = 0; m < j; ++m) {
-                        cout << final[peerID].centroids.at(0, m) << ", " << final[peerID].centroids.at(1, m) << " - ";
-                    }
-                    cout << endl;
                 }
 
                 double *bcss_storage = (double *) calloc(params.peers, sizeof(double));
@@ -1475,16 +1486,17 @@ int main(int argc, char **argv) {
 //                    cout << peerID << ": " << nout_storage[peerID] << " - " << wcss_storage[peerID] << " - " << nin_storage[peerID] << " - " << bcss_storage[peerID] << endl;
 //                    cout << metric << endl;
 //                }
-                /*double test = abs(prev[0].BetaCV - final[0].BetaCV);
-                if (abs(prev[0].BetaCV - final[0].BetaCV) <= ELBOW_THRES) {
-                    cout << "The optimal K is " << final[0].k << endl;
-                    //break;
-                } else {
-                    for (int peerID = 0; peerID < params.peers; peerID++) {
-                        prev[peerID] = final[peerID];
-                    }
-                }*/
-            }
+
+//                double test = abs(prev[0].BetaCV - final[0].BetaCV);
+//                if (abs(prev[0].BetaCV - final[0].BetaCV) <= ELBOW_THRES) {
+//                    cout << "The optimal K is " << final[0].k << endl;
+//                    //break;
+//                } else {
+//                    for (int peerID = 0; peerID < params.peers; peerID++) {
+//                        prev[peerID] = final[peerID];
+//                    }
+//                }
+            }*/
         }
         free(final);
         free(prev);
