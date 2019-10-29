@@ -13,6 +13,7 @@
   <component name="ChangeListManager">
     <list default="true" id="424560db-08e6-4a5b-8aff-21bd96c75824" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/main.cpp" afterDir="false" />
     </list>
@@ -122,7 +123,8 @@
       <workItem from="1572189068627" duration="16417000" />
       <workItem from="1572253999318" duration="10049000" />
       <workItem from="1572278646635" duration="10786000" />
-      <workItem from="1572340508492" duration="9304000" />
+      <workItem from="1572340508492" duration="9432000" />
+      <workItem from="1572364801932" duration="14382000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -194,7 +196,14 @@
       <option name="project" value="LOCAL" />
       <updated>1572292918759</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="Modified Clustering technique.&#10;Implemented Outliers identification TBM">
+      <created>1572352686204</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1572352686204</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -226,6 +235,18 @@
     <MESSAGE value="Implemented distributed kmeans clustering.&#10;TODO: Distributed evaluation (elbow criterion)" />
     <MESSAGE value="Modified distributed kmeans clustering and implemented Distributed evaluation (elbow criterion). TBM" />
     <MESSAGE value="Modified distributed kmeans clustering and implemented Distributed evaluation (elbow criterion).&#10;TODO: outliers identification" />
-    <option name="LAST_COMMIT_MESSAGE" value="Modified distributed kmeans clustering and implemented Distributed evaluation (elbow criterion).&#10;TODO: outliers identification" />
+    <MESSAGE value="Modified Clustering technique.&#10;Implemented Outliers identification TBM" />
+    <option name="LAST_COMMIT_MESSAGE" value="Modified Clustering technique.&#10;Implemented Outliers identification TBM" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/main.cpp</url>
+          <line>1511</line>
+          <option name="timeStamp" value="22" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>
