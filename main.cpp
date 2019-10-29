@@ -1082,6 +1082,30 @@ int main(int argc, char **argv) {
 
     auto clustering_start = chrono::steady_clock::now();
 
+    bool ***incircle;
+    incircle = (bool ***) malloc(params.peers * sizeof(bool **));
+    if (incircle == nullptr) {
+        cout << "Malloc error on incircle" << endl;
+        exit(-1);
+    }
+
+    for(int peerID = 0; peerID < params.peers; peerID++) {
+        incircle[peerID] = (bool **) malloc(uncorr_vars[peerID] * sizeof(bool *));
+        int npts = 0;
+        if (peerID == 0) {
+            npts = peerLastItem[peerID];
+        } else {
+            npts = peerLastItem[peerID] - peerLastItem[peerID-1];
+            if (peerID == params.peers-1) {
+                npts++;
+            }
+        }
+        for (int m = 0; m < uncorr_vars[peerID]; ++m) {
+            incircle[peerID][m] = (bool *) malloc(npts * sizeof(bool));
+        }
+        fill_n(incircle[peerID], uncorr_vars[peerID] * npts, false);
+    }
+
     for (int i = 0; i < uncorr_vars[0]; ++i) {
         cluster_report *final = (cluster_report *) calloc(params.peers, sizeof(cluster_report));
         cluster_report *prev = (cluster_report *) calloc(params.peers, sizeof(cluster_report));
@@ -1090,6 +1114,9 @@ int main(int argc, char **argv) {
             w_k.fill(0);
             cube actual_centroids(2, j, params.peers);
             cube prev_centroids(2, j, params.peers);
+            double *prev_err = (double *) calloc(params.peers, sizeof(double));
+            double *error = (double *) calloc(params.peers, sizeof(double));
+            fill_n(error, params.peers, 1e9);
 
             // Reset parameters for convergence estimate
             Numberofconverged = params.peers;
@@ -1099,6 +1126,8 @@ int main(int argc, char **argv) {
 
             while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
                 prev_centroids = actual_centroids;
+                memcpy(prev_err, error, params.peers * sizeof(double));
+                fill_n(error, params.peers, 0);
                 for(int peerID = 0; peerID < params.peers; peerID++){
                     // check peer convergence
                     if(params.roundsToExecute < 0 && converged[peerID])
@@ -1113,19 +1142,24 @@ int main(int argc, char **argv) {
                             npts++;
                         }
                     }
+                    int *clusterid = (int *) calloc(npts, sizeof(int));
                     for (int k = 0; k < npts; ++k) {
-                        int clusterid = 0;
+                        clusterid[k] = 0;
                         double mindist = L2distance(actual_centroids.at(0, 0, peerID), actual_centroids.at(1, 0, peerID), subspace[peerID][i][0][k], subspace[peerID][i][1][k]);
                         for (int l = 1; l < j; ++l) {
                             double dist = L2distance(actual_centroids.at(0, l, peerID), actual_centroids.at(1, l, peerID), subspace[peerID][i][0][k], subspace[peerID][i][1][k]);
                             if ( dist < mindist) {
-                                clusterid = l;
+                                clusterid[k] = l;
                             }
                         }
-                        w_k.at(peerID, clusterid) += 1;
-                        actual_centroids.at(0, clusterid, peerID) += subspace[peerID][i][0][k];
-                        actual_centroids.at(1, clusterid, peerID) += subspace[peerID][i][1][k];
+                        w_k.at(peerID, clusterid[k]) += 1;
+                        actual_centroids.at(0, clusterid[k], peerID) += subspace[peerID][i][0][k];
+                        actual_centroids.at(1, clusterid[k], peerID) += subspace[peerID][i][1][k];
                     }
+                    for (int k = 0; k < npts; ++k) {
+                        error[peerID] += L2distance(actual_centroids.at(0, clusterid[k], peerID) / w_k.at(peerID, clusterid[k]), actual_centroids.at(1, clusterid[k] / w_k.at(peerID, clusterid[k]), peerID), subspace[peerID][i][0][k], subspace[peerID][i][1][k]);
+                    }
+                    free(clusterid);
                 }
 
                 // Reset parameters for convergence estimate
@@ -1165,8 +1199,11 @@ int main(int argc, char **argv) {
                                 actual_centroids.at(1, l, peerID) = (actual_centroids.at(1, l, peerID) + actual_centroids.at(1, l, neighborID)) / 2;
                                 w_k.at(peerID, l) = (w_k.at(peerID, l) + w_k.at(neighborID, l)) / 2;
                             }
+                            error[peerID] = (error[peerID] + error[neighborID]) / 2;
+
                             actual_centroids.slice(neighborID) = actual_centroids.slice(peerID);
                             w_k.at(neighborID) = w_k.at(peerID);
+                            memcpy(&error[neighborID], &error[peerID], sizeof(double));
                             double mean = (dimestimate[peerID] + dimestimate[neighborID]) / 2;
                             dimestimate[peerID] = mean;
                             dimestimate[neighborID] = mean;
@@ -1212,17 +1249,11 @@ int main(int argc, char **argv) {
 
                 // check local convergence
                 if (params.roundsToExecute < 0) {
-                    double thconv = 0.001;
                     for(int peerID = 0; peerID < params.peers; peerID++){
                         if(converged[peerID])
                             continue;
-                        double error = 0.0;
-                        for (int l = 0; l < j; ++l) {
-                            for (int k = 0; k < 2; ++k) {
-                                error += fabs(actual_centroids.at(k, l, peerID) - prev_centroids.at(k, l, peerID));
-                            }
-                        }
-                        converged[peerID] = (error <= thconv);
+
+                        converged[peerID] = ((prev_err[peerID] - error[peerID]) / prev_err[peerID] <= 0.1);
 
                         if(converged[peerID]){
                             Numberofconverged --;
@@ -1233,6 +1264,8 @@ int main(int argc, char **argv) {
                 //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
                 params.roundsToExecute--;
             }
+            free(prev_err);
+            free(error);
 //            cout << j << endl;
 //            for(int peerID = 0; peerID < params.peers; peerID++){
 //                cout << peerID << ": ";
@@ -1498,6 +1531,224 @@ int main(int argc, char **argv) {
         }
         free(prev);
 
+        double *inliers = (double *) calloc(params.peers, sizeof(double));
+        double *prev_inliers = (double *) calloc(params.peers, sizeof(double));
+        double *cluster_dim = (double *) calloc(params.peers, sizeof(double));
+        for (int l = 0; l < final[0].k; ++l) {
+            for (int peerID = 0; peerID < params.peers; peerID++) {
+                int pts_count = 0;
+                if (peerID == 0) {
+                    pts_count = peerLastItem[0] + 1;
+                } else {
+                    pts_count = peerLastItem[peerID] - peerLastItem[peerID-1];
+                    if (peerID == params.peers-1) {
+                        pts_count++;
+                    }
+                }
+                cluster_dim[peerID] = cluster_size(final[peerID], l, pts_count);
+            }
+            // Reset parameters for convergence estimate
+            fill_n(dimestimate, params.peers, 0);
+            dimestimate[0] = 1;
+            Numberofconverged = params.peers;
+            fill_n(converged, params.peers, false);
+            fill_n(convRounds, params.peers, 0);
+            rounds = 0;
+
+            while ((params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0) {
+                memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
+                for (int peerID = 0; peerID < params.peers; peerID++) {
+                    // check peer convergence
+                    if (params.roundsToExecute < 0 && converged[peerID])
+                        continue;
+                    // determine peer neighbors
+                    igraph_vector_t neighbors;
+                    igraph_vector_init(&neighbors, 0);
+                    igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
+                    long neighborsSize = igraph_vector_size(&neighbors);
+                    if (fanOut < neighborsSize) {
+                        // randomly sample f adjacent vertices
+                        igraph_vector_shuffle(&neighbors);
+                        igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
+                    }
+
+                    neighborsSize = igraph_vector_size(&neighbors);
+                    for (int k = 0; k < neighborsSize; k++) {
+                        int neighborID = (int) VECTOR(neighbors)[k];
+                        igraph_integer_t edgeID;
+                        igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
+                        cluster_dim[peerID] = (cluster_dim[peerID] + cluster_dim[neighborID]) / 2;
+                        memcpy(&cluster_dim[neighborID], &cluster_dim[peerID], sizeof(double));
+                        double mean = (dimestimate[peerID] + dimestimate[neighborID]) / 2;
+                        dimestimate[peerID] = mean;
+                        dimestimate[neighborID] = mean;
+                    }
+                    igraph_vector_destroy(&neighbors);
+                }
+
+                // check local convergence
+                if (params.roundsToExecute < 0) {
+                    for (int peerID = 0; peerID < params.peers; peerID++) {
+                        if (converged[peerID])
+                            continue;
+                        bool dimestimateconv;
+                        if (prevestimate[peerID])
+                            dimestimateconv =
+                                    fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) <
+                                    params.convThreshold;
+                        else
+                            dimestimateconv = false;
+
+                        if (dimestimateconv)
+                            convRounds[peerID]++;
+                        else
+                            convRounds[peerID] = 0;
+
+                        converged[peerID] = (convRounds[peerID] >= params.convLimit);
+                        if (converged[peerID]) {
+                            Numberofconverged--;
+                        }
+                    }
+                }
+                rounds++;
+                //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
+                params.roundsToExecute--;
+            }
+
+            Numberofconverged = params.peers;
+            double *actual_dist = (double *) calloc(params.peers, sizeof(double));
+            double *actual_cluster_dim = (double *) calloc(params.peers, sizeof(double));
+            while (Numberofconverged) {
+                fill_n(actual_dist, params.peers, 0.0);
+                fill_n(actual_cluster_dim, params.peers, 0.0);
+                for (int peerID = 0; peerID < params.peers; peerID++) {
+                    int pts_count = 0;
+                    if (peerID == 0) {
+                        pts_count = peerLastItem[0] + 1;
+                    } else {
+                        pts_count = peerLastItem[peerID] - peerLastItem[peerID-1];
+                        if (peerID == params.peers-1) {
+                            pts_count++;
+                        }
+                    }
+                    for (int k = 0; k < pts_count; ++k) {
+                        if (final[peerID].cidx[k] == l && !(incircle[peerID][i][k]) ) {
+                            actual_dist[peerID] += L2distance(final[peerID].centroids.at(0, l), final[peerID].centroids.at(1, l), subspace[peerID][i][0][k], subspace[peerID][i][1][k]);
+                            actual_cluster_dim[peerID]++;
+                        }
+                    }
+                }
+
+                // Reset parameters for convergence estimate
+                fill_n(dimestimate, params.peers, 0);
+                dimestimate[0] = 1;
+                Numberofconverged = params.peers;
+                fill_n(converged, params.peers, false);
+                fill_n(convRounds, params.peers, 0);
+                rounds = 0;
+
+                while ((params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0) {
+                    memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
+                    for (int peerID = 0; peerID < params.peers; peerID++) {
+                        // check peer convergence
+                        if (params.roundsToExecute < 0 && converged[peerID])
+                            continue;
+                        // determine peer neighbors
+                        igraph_vector_t neighbors;
+                        igraph_vector_init(&neighbors, 0);
+                        igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
+                        long neighborsSize = igraph_vector_size(&neighbors);
+                        if (fanOut < neighborsSize) {
+                            // randomly sample f adjacent vertices
+                            igraph_vector_shuffle(&neighbors);
+                            igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
+                        }
+
+                        neighborsSize = igraph_vector_size(&neighbors);
+                        for (int k = 0; k < neighborsSize; k++) {
+                            int neighborID = (int) VECTOR(neighbors)[k];
+                            igraph_integer_t edgeID;
+                            igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
+
+                            actual_dist[peerID] = (actual_dist[peerID] + actual_dist[neighborID]) / 2;
+                            actual_cluster_dim[peerID] = (actual_cluster_dim[peerID] + actual_cluster_dim[neighborID]) / 2;
+
+                            memcpy(&actual_dist[neighborID], &actual_dist[peerID], sizeof(double));
+                            memcpy(&actual_cluster_dim[neighborID], &actual_cluster_dim[peerID], sizeof(double));
+                            double mean = (dimestimate[peerID] + dimestimate[neighborID]) / 2;
+                            dimestimate[peerID] = mean;
+                            dimestimate[neighborID] = mean;
+                        }
+                        igraph_vector_destroy(&neighbors);
+                    }
+
+                    // check local convergence
+                    if (params.roundsToExecute < 0) {
+                        for (int peerID = 0; peerID < params.peers; peerID++) {
+                            if (converged[peerID])
+                                continue;
+                            bool dimestimateconv;
+                            if (prevestimate[peerID])
+                                dimestimateconv =
+                                        fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) <
+                                        params.convThreshold;
+                            else
+                                dimestimateconv = false;
+
+                            if (dimestimateconv)
+                                convRounds[peerID]++;
+                            else
+                                convRounds[peerID] = 0;
+
+                            converged[peerID] = (convRounds[peerID] >= params.convLimit);
+                            if (converged[peerID]) {
+                                Numberofconverged--;
+                            }
+                        }
+                    }
+                    rounds++;
+                    //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
+                    params.roundsToExecute--;
+                }
+
+                for (int peerID = 0; peerID < params.peers; peerID++) {
+                    double dist_mean = actual_dist[peerID] / actual_cluster_dim[peerID];
+                }
+
+                // check local convergence
+                for (int peerID = 0; peerID < params.peers; peerID++) {
+                    if (converged[peerID])
+                        continue;
+
+                    converged[peerID] = ( (inliers[peerID] >= PERCENTAGE_INCIRCLE * cluster_dim[peerID])
+                            || prev_inliers[peerID] == inliers[peerID] );
+                    if (converged[peerID]) {
+                        Numberofconverged--;
+                    } else {
+                        prev_inliers[peerID] = inliers[peerID];
+                    }
+                }
+            }
+            while (k < PERCENTAGE_INCIRCLE * cls_size) {
+                double dist = 0.0;
+                int actual_cluster_size = 0;
+                for (int l = 0; l < N_DATA; ++l) {
+                    if (rep.cidx[l] == j && !(incircle[i][l])) {
+                        dist += L2distance(rep.centroids(0,j), rep.centroids(1,j), cs[i][0][l], cs[i][1][l]);
+                        actual_cluster_size++;
+                    }
+                }
+                double dist_mean = dist / actual_cluster_size;
+                for (int l = 0; l < N_DATA; ++l) {
+                    if (rep.cidx[l] == j && !(incircle[i][l])) {
+                        if (L2distance(rep.centroids(0,j), rep.centroids(1,j), cs[i][0][l], cs[i][1][l]) <= dist_mean) {
+                            incircle[i][l] = true;
+                            k++;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     auto clustering_end = chrono::steady_clock::now();

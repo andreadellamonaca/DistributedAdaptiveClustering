@@ -13,9 +13,6 @@
   <component name="ChangeListManager">
     <list default="true" id="424560db-08e6-4a5b-8aff-21bd96c75824" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/adaptive_clustering.h" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/main.cpp" afterDir="false" />
     </list>
@@ -29,6 +26,9 @@
     <option name="formatViaClangd" value="false" />
   </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug" />
+  <component name="FavoritesManager">
+    <favorites_list name="DistributedAdaptiveClustering" />
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
@@ -121,7 +121,8 @@
       <workItem from="1572174872816" duration="4351000" />
       <workItem from="1572189068627" duration="16417000" />
       <workItem from="1572253999318" duration="10049000" />
-      <workItem from="1572278646635" duration="10650000" />
+      <workItem from="1572278646635" duration="10786000" />
+      <workItem from="1572340508492" duration="9304000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -186,7 +187,14 @@
       <option name="project" value="LOCAL" />
       <updated>1572202668599</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="Modified distributed kmeans clustering and implemented Distributed evaluation (elbow criterion).&#10;TODO: outliers identification">
+      <created>1572292918759</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1572292918759</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -217,15 +225,7 @@
     <MESSAGE value="Implemente distributed kmeans clustering. TBM" />
     <MESSAGE value="Implemented distributed kmeans clustering.&#10;TODO: Distributed evaluation (elbow criterion)" />
     <MESSAGE value="Modified distributed kmeans clustering and implemented Distributed evaluation (elbow criterion). TBM" />
-    <option name="LAST_COMMIT_MESSAGE" value="Modified distributed kmeans clustering and implemented Distributed evaluation (elbow criterion). TBM" />
-  </component>
-  <component name="XDebuggerManager">
-    <watches-manager>
-      <configuration name="CMakeRunConfiguration">
-        <watch expression="j&#10;" language="ObjectiveC" />
-        <watch expression="error&#10;&#10;" language="ObjectiveC" />
-        <watch expression="rounds" language="ObjectiveC" />
-      </configuration>
-    </watches-manager>
+    <MESSAGE value="Modified distributed kmeans clustering and implemented Distributed evaluation (elbow criterion).&#10;TODO: outliers identification" />
+    <option name="LAST_COMMIT_MESSAGE" value="Modified distributed kmeans clustering and implemented Distributed evaluation (elbow criterion).&#10;TODO: outliers identification" />
   </component>
 </project>
