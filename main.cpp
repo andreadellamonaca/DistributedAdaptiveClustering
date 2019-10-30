@@ -1110,7 +1110,7 @@ int main(int argc, char **argv) {
 
     for (int i = 0; i < uncorr_vars[0]; ++i) {
         cluster_report *prev = (cluster_report *) calloc(params.peers, sizeof(cluster_report));
-        for (int j = 1; j <= 1/*K_MAX*/; ++j) {
+        for (int j = 1; j <= 3/*K_MAX*/; ++j) {
             double *localsum_storage, **localsum_i, ***localsum;
             localsum_storage = (double *) malloc(j * 2 * params.peers * sizeof(double));
             localsum_i = (double **) malloc(2 * params.peers * sizeof(double *));
@@ -1125,11 +1125,19 @@ int main(int argc, char **argv) {
             weights_storage = (double *) malloc(params.peers * j * sizeof(double));
             weights = (double **) malloc(params.peers * sizeof(double *));
             for (int i1 = 0; i1 < params.peers; ++i1) {
-                weights[i1] = &weights_storage[i * j];
+                weights[i1] = &weights_storage[i1 * j];
+            }
+            double *centroids_storage, **centroids_i, ***centroids;
+            centroids_storage = (double *) malloc(j * 2 * params.peers * sizeof(double));
+            centroids_i = (double **) malloc(2 * params.peers * sizeof(double *));
+            centroids = (double ***) malloc(params.peers * sizeof(double **));
+            for (int i1 = 0; i1 < 2 * params.peers; ++i1) {
+                centroids_i[i1] = &centroids_storage[i1 * j];
+            }
+            for (int i1 = 0; i1 < params.peers; ++i1) {
+                centroids[i1] = &centroids_i[i1 * 2];
             }
 
-            cube prev_centroids(2, j, params.peers);
-            cube actual_centroids(2, j, params.peers, fill::randu);
             double *prev_err = (double *) calloc(params.peers, sizeof(double));
             double *error = (double *) calloc(params.peers, sizeof(double));
             fill_n(error, params.peers, 1e9);
@@ -1139,16 +1147,15 @@ int main(int argc, char **argv) {
             fill_n(converged, params.peers, false);
 
             while( Numberofconverged ) {
-                fill_n(localsum_storage, j * 2 * params.peers, 0.0);
-                fill_n(weights_storage, params.peers * j, 0.0);
                 memcpy(prev_err, error, params.peers * sizeof(double));
-                fill_n(error, params.peers, 0);
-                prev_centroids = actual_centroids;
                 for(int peerID = 0; peerID < params.peers; peerID++){
                     // check peer convergence
                     if(converged[peerID])
                         continue;
 
+                    fill_n(weights[peerID], j, 0.0);
+                    fill_n(localsum[peerID][0], 2 * j, 0.0);
+                    error[peerID] = 0.0;
                     int npts = 0;
                     if (peerID == 0) {
                         npts = peerLastItem[peerID] + 1;
@@ -1157,9 +1164,9 @@ int main(int argc, char **argv) {
                     }
                     for (int k = 0; k < npts; ++k) {
                         int clusterid = 0;
-                        double mindist = L2distance(actual_centroids.at(0, 0, peerID), actual_centroids.at(1, 0, peerID), subspace[peerID][i][0][k], subspace[peerID][i][1][k]);
+                        double mindist = pow(L2distance(centroids[peerID][0][0], centroids[peerID][1][0], subspace[peerID][i][0][k], subspace[peerID][i][1][k]), 2);
                         for (int l = 1; l < j; ++l) {
-                            double dist = L2distance(actual_centroids.at(0, l, peerID), actual_centroids.at(1, l, peerID), subspace[peerID][i][0][k], subspace[peerID][i][1][k]);
+                            double dist = pow(L2distance(centroids[peerID][0][l], centroids[peerID][1][l], subspace[peerID][i][0][k], subspace[peerID][i][1][k]), 2);
                             if ( dist < mindist ) {
                                 mindist = dist;
                                 clusterid = l;
@@ -1168,7 +1175,7 @@ int main(int argc, char **argv) {
                         weights[peerID][clusterid] += 1;
                         localsum[peerID][0][clusterid] += subspace[peerID][i][0][k];
                         localsum[peerID][1][clusterid] += subspace[peerID][i][1][k];
-                        error[peerID] += L2distance(actual_centroids.at(0, clusterid, peerID), actual_centroids.at(1, clusterid, peerID), subspace[peerID][i][0][k], subspace[peerID][i][1][k]);
+                        error[peerID] += pow(L2distance(centroids[peerID][0][clusterid], centroids[peerID][1][clusterid], subspace[peerID][i][0][k], subspace[peerID][i][1][k]), 2);
                     }
                 }
 
@@ -1194,23 +1201,32 @@ int main(int argc, char **argv) {
                         igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
 
                         for (int l = 0; l < j; ++l) {
-                            actual_centroids.at(0, l, peerID) = (localsum[peerID][0][l] + localsum[neighborID][0][l]) / 2;
-                            actual_centroids.at(1, l, peerID) = (localsum[peerID][1][l] + localsum[neighborID][1][l]) / 2;
+                            centroids[peerID][0][l] = (localsum[peerID][0][l] + localsum[neighborID][0][l]) / 2;
+                            centroids[peerID][1][l] = (localsum[peerID][1][l] + localsum[neighborID][1][l]) / 2;
                             weights[peerID][l] = (weights[peerID][l] + weights[neighborID][l]) / 2;
                         }
-                        error[peerID] = (error[peerID] + error[neighborID]) / 2;
 
-                        actual_centroids.slice(neighborID) = actual_centroids.slice(peerID);
+                        memcpy(centroids[neighborID][0], centroids[peerID][0], 2 * j * sizeof(double));
                         memcpy(weights[neighborID], weights[peerID], j * sizeof(double));
-                        memcpy(&error[neighborID], &error[peerID], sizeof(double));
+                        double mean_error = (error[peerID] + error[neighborID]) / 2;
+                        error[peerID] = mean_error;
+                        error[neighborID] = mean_error;
                     }
                     igraph_vector_destroy(&neighbors);
                 }
 
                 for(int peerID = 0; peerID < params.peers; peerID++){
+                    // check peer convergence
+                    if(converged[peerID])
+                        continue;
                     for (int l = 0; l < j; ++l) {
-                        actual_centroids.at(0, l, peerID) = actual_centroids.at(0, l, peerID) / weights[peerID][l];
-                        actual_centroids.at(1, l, peerID) = actual_centroids.at(1, l, peerID) / weights[peerID][l];
+                        if (weights[peerID][l] == 0.0) {
+                            centroids[peerID][0][l] = 0.0;
+                            centroids[peerID][1][l] = 0.0;
+                        } else {
+                            centroids[peerID][0][l] = centroids[peerID][0][l] / weights[peerID][l];
+                            centroids[peerID][1][l] = centroids[peerID][1][l] / weights[peerID][l];
+                        }
                     }
                 }
 
@@ -1219,14 +1235,14 @@ int main(int argc, char **argv) {
                     if(converged[peerID])
                         continue;
 
-                    converged[peerID] = ((prev_err[peerID] - error[peerID]) / prev_err[peerID] <= 0.001);
+                    converged[peerID] = ((prev_err[peerID] - error[peerID]) / prev_err[peerID] <= 0.0001);
 
 
                     if(converged[peerID]){
                         Numberofconverged --;
                     }
                 }
-                cerr << "\r Active peers: " << Numberofconverged << "          ";
+                //cerr << "\r Active peers: " << Numberofconverged << "          ";
             }
             free(localsum_storage);
             free(localsum_i);
@@ -1238,7 +1254,7 @@ int main(int argc, char **argv) {
             for(int peerID = 0; peerID < params.peers; peerID++){
                 cout << peerID << ": ";
                 for (int k = 0; k < j; ++k) {
-                    cout << actual_centroids.at(0, k, peerID) << ", " << actual_centroids.at(1, k, peerID) << " | ";
+                    cout << centroids[peerID][0][k] << ", " << centroids[peerID][1][k] << " | ";
                 }
                 cout << endl;
             }
@@ -1263,7 +1279,11 @@ int main(int argc, char **argv) {
                     create_cidx_matrix(subspace[peerID][i], npts, final[i][peerID]);
                 }
             }
-*//*
+*/
+            free(centroids_storage);
+            free(centroids_i);
+            free(centroids);
+/*
             if (j > 1) {
                 double *pts_storage = (double *) calloc(params.peers * j, sizeof(double));
                 fill_n(pts_storage, params.peers * j, 0);
