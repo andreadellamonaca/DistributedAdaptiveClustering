@@ -124,7 +124,10 @@
       <workItem from="1572253999318" duration="10049000" />
       <workItem from="1572278646635" duration="10786000" />
       <workItem from="1572340508492" duration="9432000" />
-      <workItem from="1572364801932" duration="14382000" />
+      <workItem from="1572364801932" duration="15126000" />
+      <workItem from="1572388048381" duration="1548000" />
+      <workItem from="1572428280043" duration="12517000" />
+      <workItem from="1572450081563" duration="14169000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -203,7 +206,14 @@
       <option name="project" value="LOCAL" />
       <updated>1572352686204</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="Implemented Outliers identification and output print.&#10;Bug fixs">
+      <created>1572380304128</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1572380304128</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -236,15 +246,16 @@
     <MESSAGE value="Modified distributed kmeans clustering and implemented Distributed evaluation (elbow criterion). TBM" />
     <MESSAGE value="Modified distributed kmeans clustering and implemented Distributed evaluation (elbow criterion).&#10;TODO: outliers identification" />
     <MESSAGE value="Modified Clustering technique.&#10;Implemented Outliers identification TBM" />
-    <option name="LAST_COMMIT_MESSAGE" value="Modified Clustering technique.&#10;Implemented Outliers identification TBM" />
+    <MESSAGE value="Implemented Outliers identification and output print.&#10;Bug fixs" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implemented Outliers identification and output print.&#10;Bug fixs" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
-          <url>file://$PROJECT_DIR$/main.cpp</url>
-          <line>1511</line>
-          <option name="timeStamp" value="22" />
+          <url>file://$PROJECT_DIR$/main2.cpp</url>
+          <line>1332</line>
+          <option name="timeStamp" value="18" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
