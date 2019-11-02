@@ -12,7 +12,7 @@ using namespace alglib;
 using namespace arma;
 
 #define K_MAX 10 //Max number of clusters for Elbow criterion
-#define ELBOW_THRES 3 //BetaCV Threshold for Elbow criterion
+#define ELBOW_THRES 0.25 //BetaCV Threshold for Elbow criterion
 #define PERCENTAGE_INCIRCLE 0.90 //Percentage of points within the circle
 #define PERCENTAGE_SUBSPACES 0.80 //Percentage of subspaces for outliers occurrences evaluation
 
