@@ -314,15 +314,14 @@ int main(int argc, char **argv) {
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++){
+        double weight = 1 / (double) partitionSize[peerID];
         if (peerID == 0) {
-            double weight = 1 / (double) partitionSize[peerID];
             for (int i = 0; i <= peerLastItem[peerID]; ++i) {
                 for (int j = 0; j < n_dims; ++j) {
                     avgsummaries[peerID][j] += weight * data[i][j];
                 }
             }
         } else {
-            double weight = 1 / (double) partitionSize[peerID];
             for (int i = peerLastItem[peerID-1] + 1; i <= peerLastItem[peerID]; ++i) {
                 for (int j = 0; j < n_dims; ++j) {
                     avgsummaries[peerID][j] += weight * data[i][j];
@@ -435,14 +434,6 @@ int main(int argc, char **argv) {
         cout << "Malloc error on pcc" << endl;
         exit(-1);
     }
-
-    for (int i = 0; i < params.peers * n_dims; ++i) {
-        pcc_i[i] = &pcc_storage[i * n_dims];
-    }
-    for (int i = 0; i < params.peers; ++i) {
-        pcc[i] = &pcc_i[i * n_dims];
-    }
-
     double **squaresum_dims, *squaresum_dims_storage;
     squaresum_dims_storage = (double *) malloc(params.peers * n_dims * sizeof(double));
     if (squaresum_dims_storage == nullptr) {
@@ -456,7 +447,11 @@ int main(int argc, char **argv) {
         exit(-1);
     }
 
+    for (int i = 0; i < params.peers * n_dims; ++i) {
+        pcc_i[i] = &pcc_storage[i * n_dims];
+    }
     for (int i = 0; i < params.peers; ++i) {
+        pcc[i] = &pcc_i[i * n_dims];
         squaresum_dims[i] = &squaresum_dims_storage[i * n_dims];
     }
 
@@ -596,7 +591,7 @@ int main(int argc, char **argv) {
         for (int i = 0; i < n_dims; ++i) {
             double overall = 0.0;
             for (int j = 0; j < n_dims; ++j) {
-                if (i != j) {
+                if (j != i) {
                     overall += pcc[peerID][i][j];
                 }
             }
@@ -724,7 +719,7 @@ int main(int argc, char **argv) {
     for(int peerID = 0; peerID < params.peers; peerID++){
         for (int i = 0; i < corr_vars[peerID]; ++i) {
             for (int j = i; j < corr_vars[peerID]; ++j) {
-                newspace[peerID][i][j]=0;
+                newspace[peerID][i][j] = 0;
                 for (int k = 0; k < partitionSize[peerID]; ++k) {
                     newspace[peerID][i][j] += corr[peerID][i][k] * corr[peerID][j][k];
                 }
@@ -885,8 +880,8 @@ int main(int argc, char **argv) {
         }
     }
 
+    double *covar_storage, **covar_i, ***covar;
     for (int m = 0; m < uncorr_vars[0]; ++m) {
-        double *covar_storage, **covar_i, ***covar;
         covar_storage = (double *) malloc(params.peers * 3 * 3 * sizeof(double));
         if (covar_storage == nullptr) {
             cout << "Malloc error on covar_storage" << endl;
@@ -922,7 +917,7 @@ int main(int argc, char **argv) {
 
             for (int l = 0; l < 3; ++l) {
                 for (int j = l; j < 3; ++j) {
-                    covar[peerID][l][j]=0;
+                    covar[peerID][l][j] = 0;
                     for (int k = 0; k < partitionSize[peerID]; ++k) {
                         covar[peerID][l][j] += combine[peerID][l][k] * combine[peerID][j][k];
                     }
@@ -930,8 +925,6 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        free(uncorr);
-        free(uncorr_storage);
 
         // Reset parameters for convergence estimate
         fill_n(dimestimate, params.peers, 0);
@@ -1026,6 +1019,8 @@ int main(int argc, char **argv) {
         free(covar_i);
         free(covar_storage);
     }
+    free(uncorr);
+    free(uncorr_storage);
     free(combine);
 
     auto cs_end = chrono::steady_clock::now();
@@ -1061,12 +1056,13 @@ int main(int argc, char **argv) {
 
     cluster_report *final_i = (cluster_report *) calloc(uncorr_vars[0] * params.peers, sizeof(cluster_report));
     cluster_report **final = (cluster_report **) calloc(uncorr_vars[0], sizeof(cluster_report*));
-    for (int m = 0; m < uncorr_vars[0]; ++m) {
-        final[m] = &final_i[m * params.peers];
-    }
+    double *localsum_storage, **localsum_i, ***localsum, *weights_storage, **weights, *prev_err, *error;
+    double *pts_storage, **pts_incluster, *c_mean_storage, **c_mean;
 
     for (int i = 0; i < uncorr_vars[0]; ++i) {
+        final[i] = &final_i[i * params.peers];
         cluster_report *prev = (cluster_report *) calloc(params.peers, sizeof(cluster_report));
+
         for (int j = 1; j <= params.k_max; ++j) {
             cube centroids(2, j, params.peers, fill::zeros);
             centroids.slice(0) = randu<mat>(2, j);
@@ -1141,24 +1137,21 @@ int main(int argc, char **argv) {
                 centroids.slice(peerID) = centroids.slice(peerID) / dimestimate[peerID];
             }
 
-            double *localsum_storage, **localsum_i, ***localsum;
             localsum_storage = (double *) malloc(j * 2 * params.peers * sizeof(double));
             localsum_i = (double **) malloc(2 * params.peers * sizeof(double *));
             localsum = (double ***) malloc(params.peers * sizeof(double **));
+            weights_storage = (double *) malloc(params.peers * j * sizeof(double));
+            weights = (double **) malloc(params.peers * sizeof(double *));
             for (int i1 = 0; i1 < 2 * params.peers; ++i1) {
                 localsum_i[i1] = &localsum_storage[i1 * j];
             }
             for (int i1 = 0; i1 < params.peers; ++i1) {
                 localsum[i1] = &localsum_i[i1 * 2];
-            }
-            double *weights_storage, **weights;
-            weights_storage = (double *) malloc(params.peers * j * sizeof(double));
-            weights = (double **) malloc(params.peers * sizeof(double *));
-            for (int i1 = 0; i1 < params.peers; ++i1) {
                 weights[i1] = &weights_storage[i1 * j];
             }
-            double *prev_err = (double *) calloc(params.peers, sizeof(double));
-            double *error = (double *) calloc(params.peers, sizeof(double));
+
+            prev_err = (double *) calloc(params.peers, sizeof(double));
+            error = (double *) calloc(params.peers, sizeof(double));
             fill_n(error, params.peers, 1e9);
 
             // Reset parameters for convergence estimate
@@ -1280,7 +1273,7 @@ int main(int argc, char **argv) {
                         centroids(0, l, peerID) = localsum[peerID][0][l] / weights[peerID][l];
                         centroids(1, l, peerID) = localsum[peerID][1][l] / weights[peerID][l];
                     }
-                    error[peerID] = error[peerID] / dimestimate[peerID];;
+                    error[peerID] = error[peerID] / dimestimate[peerID];
                 }
 
                 // check local convergence
@@ -1328,11 +1321,11 @@ int main(int argc, char **argv) {
             }
 
             if (j > 1) {
-                double *pts_storage = (double *) calloc(params.peers * j, sizeof(double));
+                pts_storage = (double *) calloc(params.peers * j, sizeof(double));
                 fill_n(pts_storage, params.peers * j, 0);
-                double **pts_incluster = (double **) calloc(params.peers, sizeof(double*));
-                double *c_mean_storage = (double *) calloc(params.peers * 2, sizeof(double));
-                double **c_mean = (double **) calloc(params.peers, sizeof(double*));
+                pts_incluster = (double **) calloc(params.peers, sizeof(double*));
+                c_mean_storage = (double *) calloc(params.peers * 2, sizeof(double));
+                c_mean = (double **) calloc(params.peers, sizeof(double*));
                 for (int peerID = 0; peerID < params.peers; peerID++) {
                     pts_incluster[peerID] = &pts_storage[peerID * j];
                     c_mean[peerID] = &c_mean_storage[peerID * 2];
@@ -1379,6 +1372,7 @@ int main(int argc, char **argv) {
                             int neighborID = (int) VECTOR(neighbors)[k];
                             igraph_integer_t edgeID;
                             igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
+
                             for (int l = 0; l < 2; ++l) {
                                 c_mean[peerID][l] = (c_mean[peerID][l] + c_mean[neighborID][l]) / 2;
                             }
