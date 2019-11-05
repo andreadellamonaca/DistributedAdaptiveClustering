@@ -295,7 +295,7 @@ int main(int argc, char **argv) {
 
     auto std_start = chrono::steady_clock::now();
 
-    //Local Average
+    /*** Local Average for standardization ***/
     double **avgsummaries, *avg_storage;
     avg_storage = (double *) malloc(params.peers * n_dims * sizeof(double));
     if (avg_storage == nullptr) {
@@ -312,7 +312,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < params.peers; ++i) {
         avgsummaries[i] = &avg_storage[i * n_dims];
     }
-
+    /*** Local estimate ***/
     for(int peerID = 0; peerID < params.peers; peerID++){
         double weight = 1 / (double) partitionSize[peerID];
         if (peerID == 0) {
@@ -329,7 +329,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-
+    /*** Consensus on average ***/
     while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
         memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
         for(int peerID = 0; peerID < params.peers; peerID++){
@@ -390,7 +390,7 @@ int main(int argc, char **argv) {
         //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
         params.roundsToExecute--;
     }
-
+    /*** Standardization ***/
     for(int peerID = 0; peerID < params.peers; peerID++){
         if (peerID == 0) {
             for (int i = 0; i <= peerLastItem[peerID]; ++i) {
@@ -416,7 +416,7 @@ int main(int argc, char **argv) {
     }
 
     auto pcc_start = chrono::steady_clock::now();
-
+    /*** Pearson Matrix structure ***/
     double *pcc_storage, **pcc_i, ***pcc;
     pcc_storage = (double *) malloc(params.peers * n_dims * n_dims * sizeof(double));
     if (pcc_storage == nullptr) {
@@ -457,7 +457,7 @@ int main(int argc, char **argv) {
 
     for(int peerID = 0; peerID < params.peers; peerID++){
         for (int l = 0; l < n_dims; ++l) {
-            pcc[peerID][l][l] = 1;
+            /*** Local sum of squares of each dimension (for Pearson coefficient denominator) ***/
             if (peerID == 0) {
                 for (int i = 0; i <= peerLastItem[peerID]; ++i) {
                     squaresum_dims[peerID][l] += pow(data[i][l], 2);
@@ -467,6 +467,8 @@ int main(int argc, char **argv) {
                     squaresum_dims[peerID][l] += pow(data[i][l], 2);
                 }
             }
+            /*** Local estimate Pearson coefficients ***/
+            pcc[peerID][l][l] = 1;
             for (int m = l + 1; m < n_dims; ++m) {
                 if (peerID == 0) {
                     for (int i = 0; i <= peerLastItem[peerID]; ++i) {
@@ -480,7 +482,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-
+    /*** Consensus on Pearson matrix ***/
     // Reset parameters for convergence estimate
     fill_n(dimestimate, params.peers, 0);
     dimestimate[0] = 1;
@@ -572,7 +574,7 @@ int main(int argc, char **argv) {
     }
 
     auto partition_start = chrono::steady_clock::now();
-
+    /*** Structure for CORR and UNCORR cardinality ***/
     int *uncorr_vars, *corr_vars;
     corr_vars = (int *) malloc(params.peers * sizeof(int));
     if (corr_vars == nullptr) {
@@ -615,7 +617,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-
+    /*** Structures for CORR and UNCORR partitioning ***/
     int *uncorr_storage, **uncorr;
     uncorr_storage = (int *) malloc(params.peers * uncorr_vars[0] * sizeof(int));
     if (uncorr_storage == nullptr) {
@@ -691,43 +693,43 @@ int main(int argc, char **argv) {
 
     auto pca_start = chrono::steady_clock::now();
 
-    //Define the structure to save PC1_corr and PC2_corr
-    double *newspace_storage, **newspace_i, ***newspace;
-    newspace_storage = (double *) malloc(params.peers * corr_vars[0] * corr_vars[0] * sizeof(double));
-    if (newspace_storage == nullptr) {
-        cout << "Malloc error on newspace_storage" << endl;
+    /*** Structure to compute Covariance Matrix for CORR set ***/
+    double *covar_storage, **covar_i, ***covar;
+    covar_storage = (double *) malloc(params.peers * corr_vars[0] * corr_vars[0] * sizeof(double));
+    if (covar_storage == nullptr) {
+        cout << "Malloc error on covar_storage" << endl;
         exit(-1);
     }
-    newspace_i = (double **) malloc(params.peers * corr_vars[0] * sizeof(double *));
-    if (newspace_i == nullptr) {
-        cout << "Malloc error on newspace_i" << endl;
+    covar_i = (double **) malloc(params.peers * corr_vars[0] * sizeof(double *));
+    if (covar_i == nullptr) {
+        cout << "Malloc error on covar_i" << endl;
         exit(-1);
     }
-    newspace = (double ***) malloc(params.peers * sizeof(double **));
-    if (newspace == nullptr) {
-        cout << "Malloc error on newspace" << endl;
+    covar = (double ***) malloc(params.peers * sizeof(double **));
+    if (covar == nullptr) {
+        cout << "Malloc error on covar" << endl;
         exit(-1);
     }
 
     for (int i = 0; i < params.peers * corr_vars[0]; ++i) {
-        newspace_i[i] = &newspace_storage[i * corr_vars[0]];
+        covar_i[i] = &covar_storage[i * corr_vars[0]];
     }
     for (int i = 0; i < params.peers; ++i) {
-        newspace[i] = &newspace_i[i * corr_vars[0]];
+        covar[i] = &covar_i[i * corr_vars[0]];
     }
-
+    /*** Local estimate for Covariance Matrix for CORR ***/
     for(int peerID = 0; peerID < params.peers; peerID++){
         for (int i = 0; i < corr_vars[peerID]; ++i) {
             for (int j = i; j < corr_vars[peerID]; ++j) {
-                newspace[peerID][i][j] = 0;
+                covar[peerID][i][j] = 0;
                 for (int k = 0; k < partitionSize[peerID]; ++k) {
-                    newspace[peerID][i][j] += corr[peerID][i][k] * corr[peerID][j][k];
+                    covar[peerID][i][j] += corr[peerID][i][k] * corr[peerID][j][k];
                 }
-                newspace[peerID][i][j] = newspace[peerID][i][j] / (partitionSize[peerID] - 1);
+                covar[peerID][i][j] = covar[peerID][i][j] / (partitionSize[peerID] - 1);
             }
         }
     }
-
+    /*** Consensus on Covariance Matrix for CORR ***/
     // Reset parameters for convergence estimate
     fill_n(dimestimate, params.peers, 0);
     dimestimate[0] = 1;
@@ -761,11 +763,11 @@ int main(int argc, char **argv) {
 
                 for (int l = 0; l < corr_vars[peerID]; ++l) {
                     for (int k = l; k < corr_vars[peerID]; ++k) {
-                        newspace[peerID][l][k] = (newspace[peerID][l][k] + newspace[neighborID][l][k]) / 2;
-                        newspace[peerID][k][l] = newspace[peerID][l][k];
+                        covar[peerID][l][k] = (covar[peerID][l][k] + covar[neighborID][l][k]) / 2;
+                        covar[peerID][k][l] = covar[peerID][l][k];
                     }
                 }
-                memcpy(newspace[neighborID][0], newspace[peerID][0], corr_vars[peerID] * corr_vars[peerID] * sizeof(double));
+                memcpy(covar[neighborID][0], covar[peerID][0], corr_vars[peerID] * corr_vars[peerID] * sizeof(double));
                 double mean = (dimestimate[peerID] + dimestimate[neighborID]) / 2;
                 dimestimate[peerID] = mean;
                 dimestimate[neighborID] = mean;
@@ -799,7 +801,7 @@ int main(int argc, char **argv) {
         //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
         params.roundsToExecute--;
     }
-
+    /*** Structure to save PC1_corr, PC2_corr and the i-th dimension of UNCORR set ***/
     double ***combine;
     combine = (double ***) malloc(params.peers * sizeof(double **));
     if (combine == nullptr) {
@@ -820,8 +822,8 @@ int main(int argc, char **argv) {
                 exit(-1);
             }
         }
-
-        mat cov_mat(newspace[peerID][0], corr_vars[peerID], corr_vars[peerID]);
+        /*** Each peer compute eigenvalues/eigenvectors locally, get the 2 Principal Components and save in "combine" ***/
+        mat cov_mat(covar[peerID][0], corr_vars[peerID], corr_vars[peerID]);
         vec eigval;
         mat eigvec;
         eig_sym(eigval, eigvec, cov_mat);
@@ -839,9 +841,9 @@ int main(int argc, char **argv) {
     }
     free(corr);
     free(corr_vars);
-    free(newspace_storage);
-    free(newspace_i);
-    free(newspace);
+    free(covar_storage);
+    free(covar_i);
+    free(covar);
 
     auto pca_end = chrono::steady_clock::now();
     if (!outputOnFile) {
@@ -850,7 +852,7 @@ int main(int argc, char **argv) {
     }
 
     auto cs_start = chrono::steady_clock::now();
-
+    /*** Structure to save the generated subspaces ***/
     double ****subspace;
     subspace = (double ****) malloc(params.peers * sizeof(double ***));
     if (subspace == nullptr) {
@@ -880,7 +882,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    double *covar_storage, **covar_i, ***covar;
     for (int m = 0; m < uncorr_vars[0]; ++m) {
         covar_storage = (double *) malloc(params.peers * 3 * 3 * sizeof(double));
         if (covar_storage == nullptr) {
@@ -906,6 +907,7 @@ int main(int argc, char **argv) {
         }
 
         for(int peerID = 0; peerID < params.peers; peerID++) {
+            /*** Save the m-th dimension of UNCORR set in "combine" ***/
             for (int j = 0; j < partitionSize[peerID]; ++j) {
                 if (peerID == 0) {
                     combine[peerID][2][j] = data[j][uncorr[peerID][m]];
@@ -914,7 +916,7 @@ int main(int argc, char **argv) {
                     combine[peerID][2][j] = data[index][uncorr[peerID][m]];
                 }
             }
-
+            /*** Compute Covariance Matrix on PC1_corr, PC2_corr and the m-th dimension of UNCORR set ***/
             for (int l = 0; l < 3; ++l) {
                 for (int j = l; j < 3; ++j) {
                     covar[peerID][l][j] = 0;
@@ -925,7 +927,7 @@ int main(int argc, char **argv) {
                 }
             }
         }
-
+        /*** Consensus on Covariance Matrix ***/
         // Reset parameters for convergence estimate
         fill_n(dimestimate, params.peers, 0);
         dimestimate[0] = 1;
@@ -997,7 +999,7 @@ int main(int argc, char **argv) {
             //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
             params.roundsToExecute--;
         }
-
+        /*** Each peer computes the eigenvalues/eigenvectors, get the 2 Principal Components and save in "subspace" ***/
         for(int peerID = 0; peerID < params.peers; peerID++) {
             mat cov_mat(covar[peerID][0], 3, 3);
             vec eigval;
@@ -1030,7 +1032,7 @@ int main(int argc, char **argv) {
     }
 
     auto clustering_start = chrono::steady_clock::now();
-
+    /*** Structure to keep record of inliers ***/
     bool ***incircle;
     incircle = (bool ***) malloc(params.peers * sizeof(bool **));
     if (incircle == nullptr) {
@@ -1053,10 +1055,12 @@ int main(int argc, char **argv) {
             fill_n(incircle[peerID][m], partitionSize[peerID], false);
         }
     }
-
+    /*** Structure to save the cluster report for each peer ***/
     cluster_report *final_i = (cluster_report *) calloc(uncorr_vars[0] * params.peers, sizeof(cluster_report));
     cluster_report **final = (cluster_report **) calloc(uncorr_vars[0], sizeof(cluster_report*));
+    /*** Structures used for distributed clustering ***/
     double *localsum_storage, **localsum_i, ***localsum, *weights_storage, **weights, *prev_err, *error;
+    /*** Structures used for distributed BetaCV computation ***/
     double *pts_storage, **pts_incluster, *c_mean_storage, **c_mean;
 
     for (int i = 0; i < uncorr_vars[0]; ++i) {
@@ -1065,8 +1069,9 @@ int main(int argc, char **argv) {
 
         for (int j = 1; j <= params.k_max; ++j) {
             cube centroids(2, j, params.peers, fill::zeros);
+            /*** Peer 0 set random centroids ***/
             centroids.slice(0) = randu<mat>(2, j);
-
+            /*** Broadcast random centroids ***/
             // Reset parameters for convergence estimate
             fill_n(dimestimate, params.peers, 0);
             dimestimate[0] = 1;
@@ -1136,7 +1141,7 @@ int main(int argc, char **argv) {
             for(int peerID = 0; peerID < params.peers; peerID++){
                 centroids.slice(peerID) = centroids.slice(peerID) / dimestimate[peerID];
             }
-
+            /*** Start distributed clustering ***/
             localsum_storage = (double *) malloc(j * 2 * params.peers * sizeof(double));
             localsum_i = (double **) malloc(2 * params.peers * sizeof(double *));
             localsum = (double ***) malloc(params.peers * sizeof(double **));
@@ -1167,7 +1172,7 @@ int main(int argc, char **argv) {
                     // check peer convergence
                     if(converged[peerID])
                         continue;
-
+                    /*** Local K-means clustering ***/
                     for (int l = 0; l < j; ++l) {
                         weights[peerID][l] += 1;
                         localsum[peerID][0][l] += centroids(0, l, peerID);
@@ -1189,7 +1194,7 @@ int main(int argc, char **argv) {
                         error[peerID] += pow(L2distance(centroids(0, clusterid, peerID), centroids(1, clusterid, peerID), subspace[peerID][i][0][k], subspace[peerID][i][1][k]), 2);
                     }
                 }
-
+                /*** Consensus on centroids ***/
                 // Reset parameters for convergence estimate
                 fill_n(dimestimate, params.peers, 0);
                 dimestimate[0] = 1;
@@ -1319,7 +1324,7 @@ int main(int argc, char **argv) {
                     create_cidx_matrix(subspace[peerID][i], partitionSize[peerID], final[i][peerID]);
                 }
             }
-
+            /*** Start distributed BetaCV computation (WCSS, BCSS, N_in and N_out) ***/
             if (j > 1) {
                 pts_storage = (double *) calloc(params.peers * j, sizeof(double));
                 fill_n(pts_storage, params.peers * j, 0);
@@ -1453,7 +1458,7 @@ int main(int argc, char **argv) {
                 free(c_mean);
                 free(pts_storage);
                 free(pts_incluster);
-
+                /*** Consensus on WCSS ***/
                 // Reset parameters for convergence estimate
                 fill_n(dimestimate, params.peers, 0);
                 dimestimate[0] = 1;
@@ -1543,16 +1548,17 @@ int main(int argc, char **argv) {
             }
         }
         free(prev);
-
+        /*** Structures for inliers and cluster dimension for outliers identification ***/
         double *inliers = (double *) calloc(params.peers, sizeof(double));
         double *prev_inliers = (double *) calloc(params.peers, sizeof(double));
         double *cluster_dim = (double *) calloc(params.peers, sizeof(double));
 
         for (int l = 0; l < final[i][0].k; ++l) {
+            /*** Local computation of cardinality for each cluster ***/
             for (int peerID = 0; peerID < params.peers; peerID++) {
                 cluster_dim[peerID] = cluster_size(final[i][peerID], l, partitionSize[peerID]);
             }
-
+            /*** Consensus on cardinality for each cluster ***/
             // Reset parameters for convergence estimate
             fill_n(dimestimate, params.peers, 0);
             dimestimate[0] = 1;
