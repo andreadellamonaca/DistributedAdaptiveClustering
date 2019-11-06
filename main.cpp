@@ -48,9 +48,6 @@ int main(int argc, char **argv) {
     double percentageSubspaces = 0.8; // percentage of subspaces in which a point must be outlier to be evaluated as general outlier
 
     Params          params;
-    double          elapsed;
-    int             iterations;
-    bool            autoseed = false;
     bool            outputOnFile = false;
     string          inputFilename = "../datasets/Iris.csv";
     string          outputFilename;
@@ -149,26 +146,24 @@ int main(int argc, char **argv) {
                 return -1;
             }
             inputFilename = string(argv[i]);
-        }else if (strcmp(argv[i], "-as") == 0) {
-            autoseed = true;
         } else {
             usage(argv[0]);
             return -1;
         }
     }
 
-    /*** dataset reading, loading and standardization ***/
+    /*** Dataset Loading ***/
     double **data, *data_storage;
     getDatasetDims(inputFilename, &n_dims, &n_data);
 
     data_storage = (double *) malloc(n_dims * n_data * sizeof(double));
-    if (data_storage == nullptr) {
-        cout << "Malloc error on data_storage" << endl;
+    if (!data_storage) {
+        cerr << "Malloc error on data_storage" << endl;
         exit(-1);
     }
     data = (double **) malloc(n_data * sizeof(double *));
-    if (data == nullptr) {
-        cout << "Malloc error on data" << endl;
+    if (!data) {
+        cerr << "Malloc error on data" << endl;
         exit(-1);
     }
 
@@ -178,24 +173,30 @@ int main(int argc, char **argv) {
 
     loadData(inputFilename, data, n_dims);
 
-    /*** Compute last item for each peer***/
+    /*** Partitioning phase ***/
     peerLastItem = (long *) calloc(peers, sizeof(long));
+    if (!peerLastItem) {
+        cerr << "Malloc error on peerLastItem" << endl;
+        exit(-1);
+    }
     std::random_device rd; // obtain a random number from hardware
     std::mt19937 eng(rd()); // seed the generator
     std::uniform_real_distribution<> distr(-1, 1); // define the range
 
-    /*** Partitioning phase ***/
     for(int i = 0; i < peers - 1; i++){
         float rnd = distr(eng);
         //cerr << "rnd: " << rnd << "\n";
         long last_item = rnd * ((float)n_data/(float)peers) * 0.1 + (float) (i+1) * ((float)n_data/(float)peers) - 1;
         peerLastItem[i] = last_item;
     }
-
     peerLastItem[peers - 1] = n_data-1;
 
-    /*** check the partitioning correctness ***/
+    /*** Check the partitioning correctness ***/
     partitionSize = (long *) calloc(peers, sizeof(long));
+    if (!partitionSize) {
+        cerr << "Malloc error on partitionSize" << endl;
+        exit(-1);
+    }
     long sum = peerLastItem[0] + 1;
     partitionSize[0] = peerLastItem[0] + 1;
     //cerr << "peer 0:" << sum << "\n";
@@ -210,7 +211,7 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    /*** assign parameters read from command line ***/
+    /*** Assign parameters read from command line ***/
     params.peers = peers;
     params.fanOut = fanOut;
     params.graphType = graphType;
@@ -227,7 +228,6 @@ int main(int argc, char **argv) {
         p_star = peers;
 
     params.p_star = p_star;
-
     outputOnFile = params.outputFilename.size() > 0;
 
     if (!outputOnFile) {
@@ -277,16 +277,32 @@ int main(int argc, char **argv) {
 
     // this is used to estimate the number of peers
     double *dimestimate = (double *) calloc(params.peers, sizeof(double));
+    if (!dimestimate) {
+        cerr << "Malloc error on dimestimate" << endl;
+        exit(-1);
+    }
     dimestimate[0] = 1;
 
     int Numberofconverged = params.peers;
     bool *converged = (bool *) calloc(params.peers, sizeof(bool));
+    if (!converged) {
+        cerr << "Malloc error on converged" << endl;
+        exit(-1);
+    }
     fill_n(converged, params.peers, false);
 
     int *convRounds = (int *) calloc(params.peers, sizeof(int));
+    if (!convRounds) {
+        cerr << "Malloc error on convRounds" << endl;
+        exit(-1);
+    }
     int rounds = 0;
 
     double *prevestimate = (double *) calloc(params.peers, sizeof(double));
+    if (!prevestimate) {
+        cerr << "Malloc error on prevestimate" << endl;
+        exit(-1);
+    }
 
     // Apply Dataset Standardization to each peer' substream
     if (!outputOnFile) {
@@ -298,14 +314,14 @@ int main(int argc, char **argv) {
     /*** Local Average for standardization ***/
     double **avgsummaries, *avg_storage;
     avg_storage = (double *) malloc(params.peers * n_dims * sizeof(double));
-    if (avg_storage == nullptr) {
-        cout << "Malloc error on avg_storage" << endl;
+    if (!avg_storage) {
+        cerr << "Malloc error on avg_storage" << endl;
         exit(-1);
     }
     fill_n(avg_storage, params.peers * n_dims, 0);
     avgsummaries = (double **) malloc(params.peers * sizeof(double *));
-    if (avgsummaries == nullptr) {
-        cout << "Malloc error on avgsummaries" << endl;
+    if (!avgsummaries) {
+        cerr << "Malloc error on avgsummaries" << endl;
         exit(-1);
     }
 
@@ -415,35 +431,37 @@ int main(int argc, char **argv) {
              chrono::duration_cast<chrono::nanoseconds>(std_end - std_start).count()*1e-9 << endl;
     }
 
+    if (!outputOnFile) {
+        printf("\nComputing Pearson matrix globally...\n");
+    }
+
     auto pcc_start = chrono::steady_clock::now();
     /*** Pearson Matrix structure ***/
     double *pcc_storage, **pcc_i, ***pcc;
-    pcc_storage = (double *) malloc(params.peers * n_dims * n_dims * sizeof(double));
-    if (pcc_storage == nullptr) {
-        cout << "Malloc error on pcc_storage" << endl;
+    pcc_storage = (double *) calloc(params.peers * n_dims * n_dims, sizeof(double));
+    if (!pcc_storage) {
+        cerr << "Malloc error on pcc_storage" << endl;
         exit(-1);
     }
-    fill_n(pcc_storage, params.peers * n_dims * n_dims, 0);
     pcc_i = (double **) malloc(params.peers * n_dims * sizeof(double *));
-    if (pcc_i == nullptr) {
-        cout << "Malloc error on pcc_i" << endl;
+    if (!pcc_i) {
+        cerr << "Malloc error on pcc_i" << endl;
         exit(-1);
     }
     pcc = (double ***) malloc(params.peers * sizeof(double **));
-    if (pcc == nullptr) {
-        cout << "Malloc error on pcc" << endl;
+    if (!pcc) {
+        cerr << "Malloc error on pcc" << endl;
         exit(-1);
     }
     double **squaresum_dims, *squaresum_dims_storage;
-    squaresum_dims_storage = (double *) malloc(params.peers * n_dims * sizeof(double));
-    if (squaresum_dims_storage == nullptr) {
-        cout << "Malloc error on squaresum_dims_storage" << endl;
+    squaresum_dims_storage = (double *) calloc(params.peers * n_dims, sizeof(double));
+    if (!squaresum_dims_storage) {
+        cerr << "Malloc error on squaresum_dims_storage" << endl;
         exit(-1);
     }
-    fill_n(squaresum_dims_storage, params.peers * n_dims, 0);
     squaresum_dims = (double **) malloc(params.peers * sizeof(double *));
-    if (squaresum_dims == nullptr) {
-        cout << "Malloc error on squaresum_dims" << endl;
+    if (!squaresum_dims) {
+        cerr << "Malloc error on squaresum_dims" << endl;
         exit(-1);
     }
 
@@ -458,24 +476,18 @@ int main(int argc, char **argv) {
     for(int peerID = 0; peerID < params.peers; peerID++){
         for (int l = 0; l < n_dims; ++l) {
             /*** Local sum of squares of each dimension (for Pearson coefficient denominator) ***/
+            pcc[peerID][l][l] = 1;
             if (peerID == 0) {
                 for (int i = 0; i <= peerLastItem[peerID]; ++i) {
                     squaresum_dims[peerID][l] += pow(data[i][l], 2);
+                    for (int m = l + 1; m < n_dims; ++m) {
+                        pcc[peerID][l][m] += data[i][l] * data[i][m];
+                    }
                 }
             } else {
                 for (int i = peerLastItem[peerID-1] + 1; i <= peerLastItem[peerID]; ++i) {
                     squaresum_dims[peerID][l] += pow(data[i][l], 2);
-                }
-            }
-            /*** Local estimate Pearson coefficients ***/
-            pcc[peerID][l][l] = 1;
-            for (int m = l + 1; m < n_dims; ++m) {
-                if (peerID == 0) {
-                    for (int i = 0; i <= peerLastItem[peerID]; ++i) {
-                        pcc[peerID][l][m] += data[i][l] * data[i][m];
-                    }
-                } else {
-                    for (int i = peerLastItem[peerID-1] + 1; i <= peerLastItem[peerID]; ++i) {
+                    for (int m = l + 1; m < n_dims; ++m) {
                         pcc[peerID][l][m] += data[i][l] * data[i][m];
                     }
                 }
@@ -573,23 +585,25 @@ int main(int argc, char **argv) {
              chrono::duration_cast<chrono::nanoseconds>(pcc_end - pcc_start).count()*1e-9 << endl;
     }
 
+    if (!outputOnFile) {
+        printf("\nPartitioning dimensions in CORR and UNCORR sets...\n");
+    }
+
     auto partition_start = chrono::steady_clock::now();
     /*** Structure for CORR and UNCORR cardinality ***/
     int *uncorr_vars, *corr_vars;
-    corr_vars = (int *) malloc(params.peers * sizeof(int));
-    if (corr_vars == nullptr) {
-        cout << "Malloc error on corr_vars" << endl;
+    corr_vars = (int *) calloc(params.peers, sizeof(int));
+    if (!corr_vars) {
+        cerr << "Malloc error on corr_vars" << endl;
         exit(-1);
     }
-    uncorr_vars = (int *) malloc(params.peers * sizeof(int));
-    if (uncorr_vars == nullptr) {
-        cout << "Malloc error on uncorr_vars" << endl;
+    uncorr_vars = (int *) calloc(params.peers, sizeof(int));
+    if (!uncorr_vars) {
+        cerr << "Malloc error on uncorr_vars" << endl;
         exit(-1);
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
-        corr_vars[peerID] = 0;
-        uncorr_vars[peerID] = 0;
         for (int i = 0; i < n_dims; ++i) {
             double overall = 0.0;
             for (int j = 0; j < n_dims; ++j) {
@@ -620,13 +634,13 @@ int main(int argc, char **argv) {
     /*** Structures for CORR and UNCORR partitioning ***/
     int *uncorr_storage, **uncorr;
     uncorr_storage = (int *) malloc(params.peers * uncorr_vars[0] * sizeof(int));
-    if (uncorr_storage == nullptr) {
-        cout << "Malloc error on uncorr_storage" << endl;
+    if (!uncorr_storage) {
+        cerr << "Malloc error on uncorr_storage" << endl;
         exit(-1);
     }
     uncorr = (int **) (malloc(params.peers * sizeof(int *)));
-    if (uncorr == nullptr) {
-        cout << "Malloc error on corr or uncorr" << endl;
+    if (!uncorr) {
+        cerr << "Malloc error on corr or uncorr" << endl;
         exit(-1);
     }
     for (int i = 0; i < params.peers; ++i) {
@@ -634,21 +648,21 @@ int main(int argc, char **argv) {
     }
     double ***corr;
     corr = (double ***) malloc(params.peers * sizeof(double **));
-    if (corr == nullptr) {
-        cout << "Malloc error on corr" << endl;
+    if (!corr) {
+        cerr << "Malloc error on corr" << endl;
         exit(-1);
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++){
         corr[peerID] = (double **) malloc(corr_vars[peerID] * sizeof(double *));
-        if (corr[peerID] == nullptr) {
-            cout << "Malloc error on corr for peer " << peerID << endl;
+        if (!corr[peerID]) {
+            cerr << "Malloc error on corr for peer " << peerID << endl;
             exit(-1);
         }
         for (int k = 0; k < corr_vars[peerID]; ++k) {
             corr[peerID][k] = (double *) malloc(partitionSize[peerID] * sizeof(double));
-            if (corr[peerID][k] == nullptr) {
-                cout << "Malloc error on corr for peer " << peerID << endl;
+            if (!corr[peerID][k]) {
+                cerr << "Malloc error on corr for peer " << peerID << endl;
                 exit(-1);
             }
         }
@@ -691,23 +705,27 @@ int main(int argc, char **argv) {
              chrono::duration_cast<chrono::nanoseconds>(partition_end - partition_start).count() * 1e-9 << endl;
     }
 
+    if (!outputOnFile) {
+        printf("\nComputing Principal Component Analysis on CORR set...\n");
+    }
+
     auto pca_start = chrono::steady_clock::now();
 
     /*** Structure to compute Covariance Matrix for CORR set ***/
     double *covar_storage, **covar_i, ***covar;
     covar_storage = (double *) malloc(params.peers * corr_vars[0] * corr_vars[0] * sizeof(double));
-    if (covar_storage == nullptr) {
-        cout << "Malloc error on covar_storage" << endl;
+    if (!covar_storage) {
+        cerr << "Malloc error on covar_storage" << endl;
         exit(-1);
     }
     covar_i = (double **) malloc(params.peers * corr_vars[0] * sizeof(double *));
-    if (covar_i == nullptr) {
-        cout << "Malloc error on covar_i" << endl;
+    if (!covar_i) {
+        cerr << "Malloc error on covar_i" << endl;
         exit(-1);
     }
     covar = (double ***) malloc(params.peers * sizeof(double **));
-    if (covar == nullptr) {
-        cout << "Malloc error on covar" << endl;
+    if (!covar) {
+        cerr << "Malloc error on covar" << endl;
         exit(-1);
     }
 
@@ -804,21 +822,21 @@ int main(int argc, char **argv) {
     /*** Structure to save PC1_corr, PC2_corr and the i-th dimension of UNCORR set ***/
     double ***combine;
     combine = (double ***) malloc(params.peers * sizeof(double **));
-    if (combine == nullptr) {
-        cout << "Malloc error on combine" << endl;
+    if (!combine) {
+        cerr << "Malloc error on combine" << endl;
         exit(-1);
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
         combine[peerID] = (double **) malloc(3 * sizeof(double *));
-        if (combine[peerID] == nullptr) {
-            cout << "Malloc error on combine for peer " << peerID << endl;
+        if (!combine[peerID]) {
+            cerr << "Malloc error on combine for peer " << peerID << endl;
             exit(-1);
         }
         for (int k = 0; k < 3; ++k) {
             combine[peerID][k] = (double *) malloc(partitionSize[peerID] * sizeof(double));
-            if (combine[peerID][k] == nullptr) {
-                cout << "Malloc error on combine for peer " << peerID << endl;
+            if (!combine[peerID][k]) {
+                cerr << "Malloc error on combine for peer " << peerID << endl;
                 exit(-1);
             }
         }
@@ -851,31 +869,37 @@ int main(int argc, char **argv) {
              chrono::duration_cast<chrono::nanoseconds>(pca_end - pca_start).count()*1e-9 << endl;
     }
 
+    if (!outputOnFile) {
+        printf("\nComputing Candidate Subspaces through Principal Component Analysis"
+               " on PC1corr, PC2corr and the m-th dimension in UNCORR set...\n");
+    }
+
     auto cs_start = chrono::steady_clock::now();
+
     /*** Structure to save the generated subspaces ***/
     double ****subspace;
     subspace = (double ****) malloc(params.peers * sizeof(double ***));
-    if (subspace == nullptr) {
-        cout << "Malloc error on subspace" << endl;
+    if (!subspace) {
+        cerr << "Malloc error on subspace" << endl;
         exit(-1);
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
         subspace[peerID] = (double ***) malloc(uncorr_vars[peerID] * sizeof(double **));
-        if (subspace[peerID] == nullptr) {
-            cout << "Malloc error on subspace for peer " << peerID << endl;
+        if (!subspace[peerID]) {
+            cerr << "Malloc error on subspace for peer " << peerID << endl;
             exit(-1);
         }
         for (int m = 0; m < uncorr_vars[peerID]; ++m) {
             subspace[peerID][m] = (double **) malloc(2 * sizeof(double *));
-            if (subspace[peerID][m] == nullptr) {
-                cout << "Malloc error on subspace for peer " << peerID << endl;
+            if (!subspace[peerID][m]) {
+                cerr << "Malloc error on subspace for peer " << peerID << endl;
                 exit(-1);
             }
             for (int k = 0; k < 2; ++k) {
-                subspace[peerID][m][k] = (double *) malloc(partitionSize[peerID] * sizeof(double ));
-                if (subspace[peerID][m][k] == nullptr) {
-                    cout << "Malloc error on subspace for peer " << peerID << endl;
+                subspace[peerID][m][k] = (double *) malloc(partitionSize[peerID] * sizeof(double));
+                if (!subspace[peerID][m][k]) {
+                    cerr << "Malloc error on subspace for peer " << peerID << endl;
                     exit(-1);
                 }
             }
@@ -884,18 +908,18 @@ int main(int argc, char **argv) {
 
     for (int m = 0; m < uncorr_vars[0]; ++m) {
         covar_storage = (double *) malloc(params.peers * 3 * 3 * sizeof(double));
-        if (covar_storage == nullptr) {
-            cout << "Malloc error on covar_storage" << endl;
+        if (!covar_storage) {
+            cerr << "Malloc error on covar_storage" << endl;
             exit(-1);
         }
         covar_i = (double **) malloc(params.peers * 3 * sizeof(double *));
-        if (covar_i == nullptr) {
-            cout << "Malloc error on covar_i" << endl;
+        if (!covar_i) {
+            cerr << "Malloc error on covar_i" << endl;
             exit(-1);
         }
         covar = (double ***) malloc(params.peers * sizeof(double **));
-        if (covar == nullptr) {
-            cout << "Malloc error on covar" << endl;
+        if (!covar) {
+            cerr << "Malloc error on covar" << endl;
             exit(-1);
         }
 
@@ -1031,33 +1055,44 @@ int main(int argc, char **argv) {
              chrono::duration_cast<chrono::nanoseconds>(cs_end - cs_start).count()*1e-9 << endl;
     }
 
+    if (!outputOnFile) {
+        printf("\nComputing distributed clustering...\n");
+    }
+
     auto clustering_start = chrono::steady_clock::now();
     /*** Structure to keep record of inliers ***/
     bool ***incircle;
     incircle = (bool ***) malloc(params.peers * sizeof(bool **));
-    if (incircle == nullptr) {
-        cout << "Malloc error on incircle" << endl;
+    if (!incircle) {
+        cerr << "Malloc error on incircle" << endl;
         exit(-1);
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
         incircle[peerID] = (bool **) malloc(uncorr_vars[peerID] * sizeof(bool *));
-        if (incircle[peerID] == nullptr) {
-            cout << "Malloc error on incircle for peer " << peerID << endl;
+        if (!incircle[peerID]) {
+            cerr << "Malloc error on incircle for peer " << peerID << endl;
             exit(-1);
         }
         for (int m = 0; m < uncorr_vars[peerID]; ++m) {
-            incircle[peerID][m] = (bool *) malloc(partitionSize[peerID] * sizeof(bool));
-            if (incircle[peerID][m] == nullptr) {
-                cout << "Malloc error on incircle for peer " << peerID << endl;
+            incircle[peerID][m] = (bool *) calloc(partitionSize[peerID], sizeof(bool));
+            if (!incircle[peerID][m]) {
+                cerr << "Malloc error on incircle for peer " << peerID << endl;
                 exit(-1);
             }
-            fill_n(incircle[peerID][m], partitionSize[peerID], false);
         }
     }
     /*** Structure to save the cluster report for each peer ***/
     cluster_report *final_i = (cluster_report *) calloc(uncorr_vars[0] * params.peers, sizeof(cluster_report));
+    if (!final_i) {
+        cerr << "Malloc error on final_i" << endl;
+        exit(-1);
+    }
     cluster_report **final = (cluster_report **) calloc(uncorr_vars[0], sizeof(cluster_report*));
+    if (!final) {
+        cerr << "Malloc error on final" << endl;
+        exit(-1);
+    }
     /*** Structures used for distributed clustering ***/
     double *localsum_storage, **localsum_i, ***localsum, *weights_storage, **weights, *prev_err, *error;
     /*** Structures used for distributed BetaCV computation ***/
@@ -1066,6 +1101,10 @@ int main(int argc, char **argv) {
     for (int i = 0; i < uncorr_vars[0]; ++i) {
         final[i] = &final_i[i * params.peers];
         cluster_report *prev = (cluster_report *) calloc(params.peers, sizeof(cluster_report));
+        if (!prev) {
+            cerr << "Malloc error on prev" << endl;
+            exit(-1);
+        }
 
         for (int j = 1; j <= params.k_max; ++j) {
             cube centroids(2, j, params.peers, fill::zeros);
@@ -1143,10 +1182,30 @@ int main(int argc, char **argv) {
             }
             /*** Start distributed clustering ***/
             localsum_storage = (double *) malloc(j * 2 * params.peers * sizeof(double));
+            if (!localsum_storage) {
+                cerr << "Malloc error on localsum_storage" << endl;
+                exit(-1);
+            }
             localsum_i = (double **) malloc(2 * params.peers * sizeof(double *));
+            if (!localsum_i) {
+                cerr << "Malloc error on localsum_i" << endl;
+                exit(-1);
+            }
             localsum = (double ***) malloc(params.peers * sizeof(double **));
+            if (!localsum) {
+                cerr << "Malloc error on localsum" << endl;
+                exit(-1);
+            }
             weights_storage = (double *) malloc(params.peers * j * sizeof(double));
+            if (!weights_storage) {
+                cerr << "Malloc error on weights_storage" << endl;
+                exit(-1);
+            }
             weights = (double **) malloc(params.peers * sizeof(double *));
+            if (!weights) {
+                cerr << "Malloc error on weights" << endl;
+                exit(-1);
+            }
             for (int i1 = 0; i1 < 2 * params.peers; ++i1) {
                 localsum_i[i1] = &localsum_storage[i1 * j];
             }
@@ -1155,8 +1214,16 @@ int main(int argc, char **argv) {
                 weights[i1] = &weights_storage[i1 * j];
             }
 
-            prev_err = (double *) calloc(params.peers, sizeof(double));
-            error = (double *) calloc(params.peers, sizeof(double));
+            prev_err = (double *) malloc(params.peers * sizeof(double));
+            if (!prev_err) {
+                cerr << "Malloc error on prev_err" << endl;
+                exit(-1);
+            }
+            error = (double *) malloc(params.peers * sizeof(double));
+            if (!error) {
+                cerr << "Malloc error on error" << endl;
+                exit(-1);
+            }
             fill_n(error, params.peers, 1e9);
 
             // Reset parameters for convergence estimate
@@ -1200,8 +1267,15 @@ int main(int argc, char **argv) {
                 dimestimate[0] = 1;
                 int N_converged = params.peers;
                 bool *converged2 = (bool *) calloc(params.peers, sizeof(bool));
-                fill_n(converged2, params.peers, false);
+                if (!converged2) {
+                    cerr << "Malloc error on converged2" << endl;
+                    exit(-1);
+                }
                 int *convRounds2 = (int *) calloc(params.peers, sizeof(int));
+                if (!convRounds2) {
+                    cerr << "Malloc error on convRounds2" << endl;
+                    exit(-1);
+                }
                 int rounds2 = 0;
 
                 while( (params.roundsToExecute < 0 && N_converged) || params.roundsToExecute > 0){
@@ -1304,20 +1378,19 @@ int main(int argc, char **argv) {
 
             for(int peerID = 0; peerID < params.peers; peerID++){
                 if (j == 1) {
-                    prev[peerID].cidx = (int *) malloc(partitionSize[peerID] * sizeof(int));
-                    if (prev[peerID].cidx == nullptr) {
-                        cout << "Malloc error on previous cidx for peer " << peerID << endl;
-                        exit(-1);
-                    }
-                    final[i][peerID].cidx = (int *) malloc(partitionSize[peerID] * sizeof(int));
-                    if (final[i][peerID].cidx == nullptr) {
-                        cout << "Malloc error on final cidx for peer " << peerID << endl;
-                        exit(-1);
-                    }
                     final[i][peerID].centroids = centroids.slice(peerID);
                     final[i][peerID].k = j;
                     final[i][peerID].BetaCV = 0.0;
-                    fill_n(final[i][peerID].cidx, partitionSize[peerID], 0);
+                    final[i][peerID].cidx = (int *) calloc(partitionSize[peerID], sizeof(int));
+                    if (!final[i][peerID].cidx) {
+                        cerr << "Malloc error on final cidx for peer " << peerID << endl;
+                        exit(-1);
+                    }
+                    prev[peerID].cidx = (int *) malloc(partitionSize[peerID] * sizeof(int));
+                    if (!prev[peerID].cidx) {
+                        cerr << "Malloc error on previous cidx for peer " << peerID << endl;
+                        exit(-1);
+                    }
                 } else {
                     final[i][peerID].centroids = centroids.slice(peerID);
                     final[i][peerID].k = j;
@@ -1327,10 +1400,25 @@ int main(int argc, char **argv) {
             /*** Start distributed BetaCV computation (WCSS, BCSS, N_in and N_out) ***/
             if (j > 1) {
                 pts_storage = (double *) calloc(params.peers * j, sizeof(double));
-                fill_n(pts_storage, params.peers * j, 0);
-                pts_incluster = (double **) calloc(params.peers, sizeof(double*));
+                if (!pts_storage) {
+                    cerr << "Malloc error on pts_storage" << endl;
+                    exit(-1);
+                }
+                pts_incluster = (double **) malloc(params.peers * sizeof(double *));
+                if (!pts_incluster) {
+                    cerr << "Malloc error on pts_incluster" << endl;
+                    exit(-1);
+                }
                 c_mean_storage = (double *) calloc(params.peers * 2, sizeof(double));
-                c_mean = (double **) calloc(params.peers, sizeof(double*));
+                if (!c_mean_storage) {
+                    cerr << "Malloc error on c_mean_storage" << endl;
+                    exit(-1);
+                }
+                c_mean = (double **) malloc(params.peers * sizeof(double *));
+                if (!c_mean) {
+                    cerr << "Malloc error on c_mean" << endl;
+                    exit(-1);
+                }
                 for (int peerID = 0; peerID < params.peers; peerID++) {
                     pts_incluster[peerID] = &pts_storage[peerID * j];
                     c_mean[peerID] = &c_mean_storage[peerID * 2];
@@ -1429,13 +1517,25 @@ int main(int argc, char **argv) {
                 }
 
                 double *bcss_storage = (double *) calloc(params.peers, sizeof(double));
+                if (!bcss_storage) {
+                    cerr << "Malloc error on bcss_storage" << endl;
+                    exit(-1);
+                }
                 double *wcss_storage = (double *) calloc(params.peers, sizeof(double));
+                if (!wcss_storage) {
+                    cerr << "Malloc error on wcss_storage" << endl;
+                    exit(-1);
+                }
                 double *nin_storage = (double *) calloc(params.peers, sizeof(double));
+                if (!nin_storage) {
+                    cerr << "Malloc error on nin_storage" << endl;
+                    exit(-1);
+                }
                 double *nout_storage = (double *) calloc(params.peers, sizeof(double));
-                fill_n(nin_storage, params.peers, 0);
-                fill_n(nout_storage, params.peers, 0);
-                fill_n(bcss_storage, params.peers, 0);
-                fill_n(wcss_storage, params.peers, 0);
+                if (!nout_storage) {
+                    cerr << "Malloc error on nout_storage" << endl;
+                    exit(-1);
+                }
                 for (int peerID = 0; peerID < params.peers; peerID++) {
                     for (int m = 0; m < j; ++m) {
                         nin_storage[peerID] += pts_incluster[peerID][m] * (pts_incluster[peerID][m] - 1);
@@ -1549,9 +1649,21 @@ int main(int argc, char **argv) {
         }
         free(prev);
         /*** Structures for inliers and cluster dimension for outliers identification ***/
-        double *inliers = (double *) calloc(params.peers, sizeof(double));
-        double *prev_inliers = (double *) calloc(params.peers, sizeof(double));
-        double *cluster_dim = (double *) calloc(params.peers, sizeof(double));
+        double *inliers = (double *) malloc(params.peers * sizeof(double));
+        if (!inliers) {
+            cerr << "Malloc error on inliers" << endl;
+            exit(-1);
+        }
+        double *prev_inliers = (double *) malloc(params.peers * sizeof(double));
+        if (!prev_inliers) {
+            cerr << "Malloc error on prev_inliers" << endl;
+            exit(-1);
+        }
+        double *cluster_dim = (double *) malloc(params.peers * sizeof(double));
+        if (!cluster_dim) {
+            cerr << "Malloc error on cluster_dim" << endl;
+            exit(-1);
+        }
 
         for (int l = 0; l < final[i][0].k; ++l) {
             /*** Local computation of cardinality for each cluster ***/
@@ -1634,7 +1746,15 @@ int main(int argc, char **argv) {
             Numberofconverged = params.peers;
             fill_n(converged, params.peers, false);
             double *actual_dist = (double *) calloc(params.peers, sizeof(double));
+            if (!actual_dist) {
+                cerr << "Malloc error on actual_dist" << endl;
+                exit(-1);
+            }
             double *actual_cluster_dim = (double *) calloc(params.peers, sizeof(double));
+            if (!actual_cluster_dim) {
+                cerr << "Malloc error on actual_cluster_dim" << endl;
+                exit(-1);
+            }
 
             while (Numberofconverged) {
                 memcpy(prev_inliers, inliers, params.peers * sizeof(double));
@@ -1657,7 +1777,10 @@ int main(int argc, char **argv) {
                 dimestimate[0] = 1;
                 int N_converged = params.peers;
                 bool *converged2 = (bool *) calloc(params.peers, sizeof(bool));
-                fill_n(converged2, params.peers, false);
+                if (!converged2) {
+                    cerr << "Malloc error on converged2" << endl;
+                    exit(-1);
+                }
                 fill_n(convRounds, params.peers, 0);
                 rounds = 0;
 
