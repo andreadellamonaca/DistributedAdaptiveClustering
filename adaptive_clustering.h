@@ -7,23 +7,28 @@
 #include "alglib/dataanalysis.h"
 #include <armadillo>
 
+/**
+ * @file adaptive_clustering.h
+ */
+
 using namespace std;
 using namespace alglib;
 using namespace arma;
 
+/**
+ * @struct cluster_report
+ * This structure saves the information about a K-Means instance.
+ * @var centroids
+ * Mat (structure from Armadillo library).
+ * @var k
+ * The number of clusters.
+ * @var BetaCV
+ * A metric (double value) used to choose the optimal number of clusters through the Elbow criterion.
+ * @var cidx
+ * A matrix [1, n_data] indicating the membership of data to a cluster through an index
+ * (this information is generated with create_cidx_matrix function).
+ */
 typedef struct cluster_report {
-/*************************************************************************
-This structure saves the information about a K-Means instance.
-
-Variables:
-    centroids   -   mat (structure from Armadillo library).
-    k           -   the number of clusters.
-    BetaCV      -   a metric (double value) used to choose the optimal
-                    number of clusters through the Elbow criterion.
-    cidx        -   matrix [1, n_data] indicating the membership of data
-                    to a cluster through an index (this information
-                    is generated with create_cidx_matrix function).
-*************************************************************************/
     mat centroids;
     int k;
     double BetaCV;

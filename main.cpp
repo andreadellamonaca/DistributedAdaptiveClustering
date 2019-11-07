@@ -4,6 +4,42 @@
 #include <random>
 #include "adaptive_clustering.h"
 
+/**
+ * @file main.cpp
+ */
+
+/**
+ * @struct Params
+ * A structure containing parameters read from command-line.
+ * @var peers
+ * The number of peers.
+ * @var p_star
+ * Maximum number of peers.
+ * @var inputFilename
+ * The path for the input CSV file.
+ * @var outputFilename
+ * The path for the output file.
+ * @var convThreshold
+ * The local convergence tolerance for the consensus algorithm.
+ * @var convLimit
+ * The number of consecutive rounds in which a peer must locally converge.
+ * @var graphType
+ * The graph distribution: 1 geometric, 2 Barabasi-Albert, 3 Erdos-Renyi, 4 regular (clique)
+ * @var fanOut
+ * The number of communication that a peer can carry out in a round.
+ * @var roundsToExecute
+ * The number of rounds to carry out in the consensus algorithm.
+ * @var k_max
+ * The maximum number of cluster to try for the K-Means algorithm.
+ * @var elbowThreshold
+ * The error tolerance for the selected metric to evaluate the elbow in K-means algorithm.
+ * @var convClusteringThreshold
+ * The local convergence tolerance for distributed K-Means.
+ * @var percentageIncircle
+ * The percentage of points in a cluster to be considered as inliers.
+ * @var percentageSubspaces
+ * The percentage of subspace in which a point must be outlier to be evaluated as general outlier.
+ **/
 struct Params {
     int          peers;
     int          p_star;
@@ -16,6 +52,7 @@ struct Params {
     int          roundsToExecute;
     long         k_max;
     double       elbowThreshold;
+    double       convClusteringThreshold;
     double       percentageIncircle;
     double       percentageSubspaces;
 };
@@ -44,6 +81,7 @@ int main(int argc, char **argv) {
     int p_star = -1;
     long k_max = 10; // max number of clusters to try in elbow criterion
     double elbowThreshold = 0.25; // threshold for the selection of optimal number of clusters in Elbow method
+    double convClusteringThreshold = 0.0001; // local convergence tolerance for distributed clustering
     double percentageIncircle = 0.9; // percentage of points in a cluster to be evaluated as inlier
     double percentageSubspaces = 0.8; // percentage of subspaces in which a point must be outlier to be evaluated as general outlier
 
@@ -122,6 +160,13 @@ int main(int argc, char **argv) {
             i++;
             if (i >= argc) {
                 cerr << "Missing threshold for Elbow method.\n";
+                return -1;
+            }
+            elbowThreshold = stof(argv[i]);
+        } else if (strcmp(argv[i], "-clst") == 0) {
+            i++;
+            if (i >= argc) {
+                cerr << "Missing threshold for distributed clustering.\n";
                 return -1;
             }
             elbowThreshold = stof(argv[i]);
@@ -220,6 +265,7 @@ int main(int argc, char **argv) {
     params.outputFilename = outputFilename;
     params.roundsToExecute = roundsToExecute;
     params.elbowThreshold = elbowThreshold;
+    params.convClusteringThreshold = convClusteringThreshold;
     params.k_max = k_max;
     params.percentageIncircle = percentageIncircle;
     params.percentageSubspaces = percentageSubspaces;
@@ -235,6 +281,7 @@ int main(int argc, char **argv) {
         cout << "input file= " << params.inputFilename << "\n";
         cout << "percentage in circle = " << params.percentageIncircle << "\n";
         cout << "elbow threshold = " << params.elbowThreshold << "\n";
+        cout << "convergence clustering threshold = " << params.convClusteringThreshold << "\n";
         cout << "percentage subspaces = " << params.percentageSubspaces << "\n";
         cout << "k_max = " << params.k_max << "\n";
         cout << "peers = " << params.peers << "\n";
@@ -308,6 +355,10 @@ int main(int argc, char **argv) {
     if (!outputOnFile) {
         printf("\nApplying Dataset Standardization to each peer' substream...\n");
     }
+
+    /*
+     *
+     */
 
     auto std_start = chrono::steady_clock::now();
 
@@ -1360,7 +1411,7 @@ int main(int argc, char **argv) {
                     if(converged[peerID])
                         continue;
 
-                    converged[peerID] = ((prev_err[peerID] - error[peerID]) / prev_err[peerID] <= 0.0001);
+                    converged[peerID] = ((prev_err[peerID] - error[peerID]) / prev_err[peerID] <= params.convClusteringThreshold);
 
                     if(converged[peerID]){
                         Numberofconverged --;
@@ -1941,7 +1992,7 @@ int main(int argc, char **argv) {
                         continue;
 
                     converged[peerID] = ( (inliers[peerID] >= params.percentageIncircle * cluster_dim[peerID])
-                                           || prev_inliers[peerID] == inliers[peerID] );
+                                          || prev_inliers[peerID] == inliers[peerID] );
                     if (converged[peerID]) {
                         Numberofconverged--;
                     }
@@ -2020,6 +2071,7 @@ void usage(char* cmd)
             << "-of         output filename, if specified a file with this name containing all of the peers stats is written\n"
             << "-k          max number of clusters to try in elbow criterion\n"
             << "-et         threshold for the selection of optimal number of clusters in Elbow method\n"
+            << "-clst       the local convergence tolerance for distributed K-Means.\n"
             << "-pi         percentage of points in a cluster to be evaluated as inlier\n"
             << "-pspace     percentage of subspaces in which a point must be outlier to be evaluated as general outlier\n"
             << "-if         input filename\n"
