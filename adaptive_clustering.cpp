@@ -1,13 +1,11 @@
 #include "adaptive_clustering.h"
 
 /**
- * @file adaptive_clustering.cpp
+ * The algorithm calculates the number of rows and columns in a CSV file and saves the information into dim and data.
+ * @param [in] fname the path referred to a CSV file.
+ * @param [in,out] dim the number of columns in the CSV file.
+ * @param [in,out] data the number of rows in the CSV file.
  */
-
-/// The algorithm calculates the number of rows and columns in a CSV file and saves the information into dim and data.
-/// \param fname [in] - the path referred to a CSV file
-/// \param dim [in,out] - the number of columns in the CSV file
-/// \param data [in,out] - the number of rows in the CSV file
 void getDatasetDims(string fname, int *dim, int *data) {
     int cols = 0;
     int rows = 0;
@@ -33,11 +31,14 @@ void getDatasetDims(string fname, int *dim, int *data) {
     file.close();
 }
 
-/// The algorithm loads a CSV file into a matrix of double.
-/// \param fname [in] - the number of columns in the CSV file
-/// \param array [in,out] - a matrix [n_data, n_dims], in which the CSV file is loaded
-/// \param n_dims [in] - the number of columns in the CSV file
-void loadData(string fname, double **array, int n_dims) {
+/**
+ * The algorithm loads a CSV file into a matrix of double.
+ * @param [in] fname the number of columns in the CSV file.
+ * @param [in,out] array a matrix [n_data, n_dims], in which the CSV file is loaded.
+ * @param [in] n_dims the number of columns in the CSV file.
+ * @return 0 if the dataset is loaded correctly, otherwise -1.
+ */
+int loadData(string fname, double **array, int n_dims) {
     ifstream inputFile(fname);
     int row = 0;
     while (inputFile) {
@@ -64,15 +65,19 @@ void loadData(string fname, double **array, int n_dims) {
     }
     if (!inputFile.eof()) {
         cerr << "Could not read file " << fname << endl;
-        __throw_invalid_argument("File not found.");
+        //__throw_invalid_argument("File not found.");
+        return -1;
     }
+    return 0;
 }
 
-/// The algorithm calculates the number of elements of an indicated cluster in the given cluster report.
-/// \param rep [in] - a cluster_report structure describing the K-Means instance carried out.
-/// \param cluster_id [in] - a number (between 0 and rep.k) indicating the cluster whereby we want to know the number of data in it.
-/// \param n_data [in] - number of rows in the dataset matrix.
-/// \return an integer indicating the number of data in the cluster with the given id.
+/**
+ * The algorithm calculates the number of elements of an indicated cluster in the given cluster report.
+ * @param [in] rep a cluster_report structure describing the K-Means instance carried out.
+ * @param [in] cluster_id a number (between 0 and rep.k) indicating the cluster whereby we want to know the number of data in it.
+ * @param [in] n_data number of rows in the dataset matrix.
+ * @return an integer indicating the number of data in the cluster with the given id.
+ */
 int cluster_size(cluster_report rep, int cluster_id, int n_data) {
     int occurrence = 0;
     for (int i = 0; i < n_data; ++i) {
@@ -83,10 +88,12 @@ int cluster_size(cluster_report rep, int cluster_id, int n_data) {
     return occurrence;
 }
 
-/// The algorithm creates the array [1, N_DATA] which indicates the membership of each data to a cluster through an integer.
-/// \param data [in] - a matrix [n_data, n_dims] on which the K-Means run was made.
-/// \param n_data [in] - number of rows in the dataset matrix.
-/// \param instance [in, out] - a cluster_report structure describing the K-Means instance carried out.
+/**
+ * The algorithm creates the array [1, N_DATA] which indicates the membership of each data to a cluster through an integer.
+ * @param [in] data a matrix [n_data, n_dims] on which the K-Means run was made.
+ * @param [in] n_data number of rows in the dataset matrix.
+ * @param [in,out] instance a cluster_report structure describing the K-Means instance carried out.
+ */
 void create_cidx_matrix(double **data, int n_data, cluster_report instance) {
     for (int i = 0; i < n_data; ++i) {
         double min_dist = L2distance(instance.centroids.at(0,0), instance.centroids.at(1,0), data[0][i], data[1][i]);
@@ -101,12 +108,14 @@ void create_cidx_matrix(double **data, int n_data, cluster_report instance) {
     }
 }
 
-/// The algorithm calculates the Euclidean distance between two points p_c and p_1.
-/// \param xc [in] - the first component of p_c.
-/// \param yc [in] - the second component of p_c.
-/// \param x1 [in] - the first component of p_1.
-/// \param y1 [in] - the second component of p_1.
-/// \return a double value indicating the Euclidean distance between the two given points
+/**
+ * The algorithm calculates the Euclidean distance between two points p_c and p_1.
+ * @param [in] xc the first component of p_c.
+ * @param [in] yc the second component of p_c.
+ * @param [in] x1 the first component of p_1.
+ * @param [in] y1 the second component of p_1.
+ * @return a double value indicating the Euclidean distance between the two given points.
+ */
 double L2distance(double xc, double yc, double x1, double y1) {
     double x = xc - x1;
     double y = yc - y1;
@@ -118,7 +127,9 @@ double L2distance(double xc, double yc, double x1, double y1) {
     return dist;
 }
 
-/*** Extra function to save centroids and candidate subspace in CSV files ***/
+/**
+ * Extra function to save centroids and candidate subspace in CSV files.
+ */
 void data_out(double ****data, long *lastitem, string name, bool ***incircle, int peers, int cs, cluster_report *report) {
     fstream fout;
     fout.open("../../plot/" + name, ios::out | ios::trunc);

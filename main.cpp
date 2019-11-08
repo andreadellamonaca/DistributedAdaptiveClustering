@@ -11,52 +11,28 @@
 /**
  * @struct Params
  * A structure containing parameters read from command-line.
- * @var peers
- * The number of peers.
- * @var p_star
- * Maximum number of peers.
- * @var inputFilename
- * The path for the input CSV file.
- * @var outputFilename
- * The path for the output file.
- * @var convThreshold
- * The local convergence tolerance for the consensus algorithm.
- * @var convLimit
- * The number of consecutive rounds in which a peer must locally converge.
- * @var graphType
- * The graph distribution: 1 geometric, 2 Barabasi-Albert, 3 Erdos-Renyi, 4 regular (clique)
- * @var fanOut
- * The number of communication that a peer can carry out in a round.
- * @var roundsToExecute
- * The number of rounds to carry out in the consensus algorithm.
- * @var k_max
- * The maximum number of cluster to try for the K-Means algorithm.
- * @var elbowThreshold
- * The error tolerance for the selected metric to evaluate the elbow in K-means algorithm.
- * @var convClusteringThreshold
- * The local convergence tolerance for distributed K-Means.
- * @var percentageIncircle
- * The percentage of points in a cluster to be considered as inliers.
- * @var percentageSubspaces
- * The percentage of subspace in which a point must be outlier to be evaluated as general outlier.
- **/
+ */
 struct Params {
-    int          peers;
-    int          p_star;
-    string       inputFilename;
-    string       outputFilename;
-    double       convThreshold;
-    int          convLimit;
-    int          graphType;
-    int          fanOut;
-    int          roundsToExecute;
-    long         k_max;
-    double       elbowThreshold;
-    double       convClusteringThreshold;
-    double       percentageIncircle;
-    double       percentageSubspaces;
+    int          peers; /**< The number of peers. */
+    int          p_star; /**< Maximum number of peers. */
+    string       inputFilename; /**< The path for the input CSV file. */
+    string       outputFilename; /**< The path for the output file. */
+    double       convThreshold; /**< The local convergence tolerance for the consensus algorithm. */
+    int          convLimit; /**< The number of consecutive rounds in which a peer must locally converge. */
+    int          graphType; /**< The graph distribution: 1 Geometric, 2 Barabasi-Albert, 3 Erdos-Renyi, 4 Regular (clique) */
+    int          fanOut; /**< The number of communication that a peer can carry out in a round. */
+    int          roundsToExecute; /**< The number of rounds to carry out in the consensus algorithm. */
+    long         k_max; /**< The maximum number of cluster to try for the K-Means algorithm. */
+    double       elbowThreshold; /**< The error tolerance for the selected metric to evaluate the elbow in K-means algorithm. */
+    double       convClusteringThreshold; /**< The local convergence tolerance for distributed K-Means. */
+    double       percentageIncircle; /**< The percentage of points in a cluster to be considered as inliers. */
+    double       percentageSubspaces; /**< The percentage of subspace in which a point must be outlier to be evaluated as general outlier. */
 };
 
+/**
+ * Print the needed parameters in order to run the script
+ * @param cmd The name of the script.
+ */
 void usage(char* cmd);
 igraph_t generateGeometricGraph(igraph_integer_t n, igraph_real_t radius);
 igraph_t generateBarabasiAlbertGraph(igraph_integer_t n, igraph_real_t power, igraph_integer_t m, igraph_real_t A);
@@ -73,7 +49,7 @@ int main(int argc, char **argv) {
     long *partitionSize; // size of a peer partition
     int peers = 10; // number of peers
     int fanOut = 3; //fan-out of peers
-    uint32_t seed = 16033099; // seed for the PRNG
+    //uint32_t seed = 16033099; // seed for the PRNG
     int graphType = 2; // graph distribution: 1 geometric 2 Barabasi-Albert 3 Erdos-Renyi 4 regular (clique)
     double convThreshold = 0.001; // local convergence tolerance
     int convLimit = 3; // number of consecutive rounds in which a peer must locally converge
@@ -91,7 +67,7 @@ int main(int argc, char **argv) {
     string          outputFilename;
     igraph_t        graph;
 
-    /*** parse command-line parameters ***/
+    /*** Parse command-line parameters ***/
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-p") == 0) {
             i++;
@@ -216,7 +192,10 @@ int main(int argc, char **argv) {
         data[i] = &data_storage[i * n_dims];
     }
 
-    loadData(inputFilename, data, n_dims);
+    if (loadData(inputFilename, data, n_dims)) {
+        cerr << "Error on loading dataset" << endl;
+        exit(-1);
+    }
 
     /*** Partitioning phase ***/
     peerLastItem = (long *) calloc(peers, sizeof(long));
@@ -351,15 +330,13 @@ int main(int argc, char **argv) {
         exit(-1);
     }
 
-    // Apply Dataset Standardization to each peer' substream
     if (!outputOnFile) {
         printf("\nApplying Dataset Standardization to each peer' substream...\n");
     }
 
-    /*
-     *
-     */
+    /***    Dataset Standardization
 
+     ***/
     auto std_start = chrono::steady_clock::now();
 
     /*** Local Average for standardization ***/
