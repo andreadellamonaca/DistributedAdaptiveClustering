@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
     long *partitionSize; // size of a peer partition
     int peers = 10; // number of peers
     int fanOut = 3; //fan-out of peers
-    //uint32_t seed = 16033099; // seed for the PRNG
+    uint32_t seed = 16033099; // seed for the PRNG
     int graphType = 2; // graph distribution: 1 geometric 2 Barabasi-Albert 3 Erdos-Renyi 4 regular (clique)
     double convThreshold = 0.001; // local convergence tolerance
     int convLimit = 3; // number of consecutive rounds in which a peer must locally converge
@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
     string          outputFilename;
     igraph_t        graph;
 
-    /*** Parse command-line parameters ***/
+    /*** Parse Command-Line Parameters ***/
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-p") == 0) {
             i++;
@@ -335,28 +335,28 @@ int main(int argc, char **argv) {
     }
 
     /***    Dataset Standardization
-
-     ***/
+     * The dataset is centered around the mean value.
+     * 1) Each peer computes the local average, for each dimension, on its dataset
+     * partition and saves the values on "avgsummaries".
+     * 2) An average consensus is executed on the average value for each dimension.
+     * 3) Each peer centers its dataset partition on the average reached with consensus.
+    ***/
     auto std_start = chrono::steady_clock::now();
-
-    /*** Local Average for standardization ***/
     double **avgsummaries, *avg_storage;
-    avg_storage = (double *) malloc(params.peers * n_dims * sizeof(double));
+    avg_storage = (double *) calloc(params.peers * n_dims, sizeof(double));
     if (!avg_storage) {
         cerr << "Malloc error on avg_storage" << endl;
         exit(-1);
     }
-    fill_n(avg_storage, params.peers * n_dims, 0);
     avgsummaries = (double **) malloc(params.peers * sizeof(double *));
     if (!avgsummaries) {
         cerr << "Malloc error on avgsummaries" << endl;
         exit(-1);
     }
-
     for (int i = 0; i < params.peers; ++i) {
         avgsummaries[i] = &avg_storage[i * n_dims];
     }
-    /*** Local estimate ***/
+
     for(int peerID = 0; peerID < params.peers; peerID++){
         double weight = 1 / (double) partitionSize[peerID];
         if (peerID == 0) {
@@ -373,7 +373,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-    /*** Consensus on average ***/
+
     while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
         memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
         for(int peerID = 0; peerID < params.peers; peerID++){
@@ -434,7 +434,7 @@ int main(int argc, char **argv) {
         //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
         params.roundsToExecute--;
     }
-    /*** Standardization ***/
+
     for(int peerID = 0; peerID < params.peers; peerID++){
         if (peerID == 0) {
             for (int i = 0; i <= peerLastItem[peerID]; ++i) {
@@ -463,8 +463,18 @@ int main(int argc, char **argv) {
         printf("\nComputing Pearson matrix globally...\n");
     }
 
+    /***    Pearson Matrix Computation
+     * Generally the Pearson Coefficient between two dimensions x and y is:
+     * r_xy = sum_i of (x_i - mean(x)) * (y_i - mean(y)) / sqrt(sum_i of pow2(x_i - mean(x))) * sqrt(sum_i of pow2(y_i - mean(y)))
+     * but with a centered dataset, the mean of each dimension is zero, then
+     * r_xy = sum_i of (x_i * y_i) / sqrt(sum_i of pow2(x_i) * sum_i of pow2(y_i))
+     * 1) Locally each peer computes the numerator (on pcc structure) and
+     *      the denominator (on squaresum_dims) of the previous r_xy.
+     * 2) A consensus on the sum of pcc and squaresum_dims is executed.
+     * 3) Each peer computes the Pearson matrix with the values resulting
+     *      from consensus.
+    ***/
     auto pcc_start = chrono::steady_clock::now();
-    /*** Pearson Matrix structure ***/
     double *pcc_storage, **pcc_i, ***pcc;
     pcc_storage = (double *) calloc(params.peers * n_dims * n_dims, sizeof(double));
     if (!pcc_storage) {
@@ -492,7 +502,6 @@ int main(int argc, char **argv) {
         cerr << "Malloc error on squaresum_dims" << endl;
         exit(-1);
     }
-
     for (int i = 0; i < params.peers * n_dims; ++i) {
         pcc_i[i] = &pcc_storage[i * n_dims];
     }
@@ -503,7 +512,6 @@ int main(int argc, char **argv) {
 
     for(int peerID = 0; peerID < params.peers; peerID++){
         for (int l = 0; l < n_dims; ++l) {
-            /*** Local sum of squares of each dimension (for Pearson coefficient denominator) ***/
             pcc[peerID][l][l] = 1;
             if (peerID == 0) {
                 for (int i = 0; i <= peerLastItem[peerID]; ++i) {
@@ -522,7 +530,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-    /*** Consensus on Pearson matrix ***/
+
     // Reset parameters for convergence estimate
     fill_n(dimestimate, params.peers, 0);
     dimestimate[0] = 1;
@@ -617,8 +625,14 @@ int main(int argc, char **argv) {
         printf("\nPartitioning dimensions in CORR and UNCORR sets...\n");
     }
 
+    /***    CORR And UNCORR Partitioning
+     * Locally each peer partition the dimensions in CORR and UNCORR sets
+     * based on the row-wise sum of the Pearson coefficient for each dimension.
+     * The structures corr_vars and uncorr_vars keep records of the
+     * cardinality of CORR and UNCORR sets, while corr and uncorr contain
+     * the peers' dataset partition of a dimension.
+    ***/
     auto partition_start = chrono::steady_clock::now();
-    /*** Structure for CORR and UNCORR cardinality ***/
     int *uncorr_vars, *corr_vars;
     corr_vars = (int *) calloc(params.peers, sizeof(int));
     if (!corr_vars) {
@@ -659,7 +673,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-    /*** Structures for CORR and UNCORR partitioning ***/
+
     int *uncorr_storage, **uncorr;
     uncorr_storage = (int *) malloc(params.peers * uncorr_vars[0] * sizeof(int));
     if (!uncorr_storage) {
@@ -737,6 +751,9 @@ int main(int argc, char **argv) {
         printf("\nComputing Principal Component Analysis on CORR set...\n");
     }
 
+    /***    Principal Component Analysis on CORR set
+     * 
+    ***/
     auto pca_start = chrono::steady_clock::now();
 
     /*** Structure to compute Covariance Matrix for CORR set ***/
@@ -902,6 +919,9 @@ int main(int argc, char **argv) {
                " on PC1corr, PC2corr and the m-th dimension in UNCORR set...\n");
     }
 
+    /***    Candidate Subspaces Creation
+
+    ***/
     auto cs_start = chrono::steady_clock::now();
 
     /*** Structure to save the generated subspaces ***/
@@ -1087,6 +1107,9 @@ int main(int argc, char **argv) {
         printf("\nComputing distributed clustering...\n");
     }
 
+    /***    Distributed K-Means
+
+    ***/
     auto clustering_start = chrono::steady_clock::now();
     /*** Structure to keep record of inliers ***/
     bool ***incircle;
@@ -1425,6 +1448,9 @@ int main(int argc, char **argv) {
                     create_cidx_matrix(subspace[peerID][i], partitionSize[peerID], final[i][peerID]);
                 }
             }
+            /***    BetaCV Metric Computation
+
+            ***/
             /*** Start distributed BetaCV computation (WCSS, BCSS, N_in and N_out) ***/
             if (j > 1) {
                 pts_storage = (double *) calloc(params.peers * j, sizeof(double));
@@ -1676,6 +1702,10 @@ int main(int argc, char **argv) {
             }
         }
         free(prev);
+
+        /***    Outliers Identification On Each Candidate Subspace
+
+        ***/
         /*** Structures for inliers and cluster dimension for outliers identification ***/
         double *inliers = (double *) malloc(params.peers * sizeof(double));
         if (!inliers) {

@@ -13,8 +13,6 @@
   <component name="ChangeListManager">
     <list default="true" id="424560db-08e6-4a5b-8aff-21bd96c75824" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/adaptive_clustering.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/adaptive_clustering.h" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/main.cpp" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -144,7 +142,9 @@
       <workItem from="1573142342746" duration="3687000" />
       <workItem from="1573153810486" duration="2440000" />
       <workItem from="1573156275410" duration="2588000" />
-      <workItem from="1573208597105" duration="7062000" />
+      <workItem from="1573208597105" duration="7256000" />
+      <workItem from="1573228894773" duration="3705000" />
+      <workItem from="1573240043276" duration="4463000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -293,7 +293,14 @@
       <option name="project" value="LOCAL" />
       <updated>1573158734166</updated>
     </task>
-    <option name="localTasksCounter" value="22" />
+    <task id="LOCAL-00022" summary="Doxygen comments implementation">
+      <created>1573216432379</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1573216432379</updated>
+    </task>
+    <option name="localTasksCounter" value="23" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -332,6 +339,7 @@
     <MESSAGE value="Correction Elbow criterion method.&#10;TODO: Code optimization" />
     <MESSAGE value="Added some comments" />
     <MESSAGE value="Code optimization" />
-    <option name="LAST_COMMIT_MESSAGE" value="Code optimization" />
+    <MESSAGE value="Doxygen comments implementation" />
+    <option name="LAST_COMMIT_MESSAGE" value="Doxygen comments implementation" />
   </component>
 </project>
