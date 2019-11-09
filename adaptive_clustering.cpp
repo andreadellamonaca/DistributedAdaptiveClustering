@@ -128,7 +128,7 @@ double L2distance(double xc, double yc, double x1, double y1) {
 }
 
 /**
- * Extra function to save centroids and candidate subspace in CSV files.
+ * Extra function to save centroids and candidate subspace in CSV files. NOT USED!
  */
 void data_out(double ****data, long *lastitem, string name, bool ***incircle, int peers, int cs, cluster_report *report) {
     fstream fout;
