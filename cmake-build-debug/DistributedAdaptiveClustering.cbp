@@ -90,60 +90,6 @@
 		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/adaptive_clustering.h">
 			<Option target="DistributedAdaptiveClustering"/>
 		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/alglibinternal.cpp">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/alglibinternal.h">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/alglibmisc.cpp">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/alglibmisc.h">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/ap.cpp">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/ap.h">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/dataanalysis.cpp">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/dataanalysis.h">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/linalg.cpp">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/linalg.h">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/optimization.cpp">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/optimization.h">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/solvers.cpp">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/solvers.h">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/specialfunctions.cpp">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/specialfunctions.h">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/statistics.cpp">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
-		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/alglib/statistics.h">
-			<Option target="DistributedAdaptiveClustering"/>
-		</Unit>
 		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/main.cpp">
 			<Option target="DistributedAdaptiveClustering"/>
 		</Unit>

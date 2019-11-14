@@ -6,29 +6,35 @@
  * @param [in,out] dim the number of columns in the CSV file.
  * @param [in,out] data the number of rows in the CSV file.
  */
-void getDatasetDims(string fname, int *dim, int *data) {
-    int cols = 0;
-    int rows = 0;
+int getDatasetDims(string fname, int &dim, int &data) {
+    dim = 0;
+    data = 0;
     ifstream file(fname);
-    string line;
-    int first = 1;
-
-    while (getline(file, line)) {
-        if (first) {
-            istringstream iss(line);
-            string result;
-            while (getline(iss, result, ','))
-            {
-                cols++;
+    while (file) {
+        string s;
+        if (!getline(file, s)) break;
+        if (data == 0) {
+            istringstream ss(s);
+            while (ss) {
+                string line;
+                if (!getline(ss, line, ','))
+                    break;
+                dim++;
             }
-            first = 0;
         }
-        rows++;
+        data++;
     }
-    *dim = cols;
-    *data = rows;
-    cout << "Dataset: #DATA = " << *data << " , #DIMENSIONS = " << *dim << endl;
+
+    if (!file.eof()) {
+        cerr << "Could not read file " << fname << "\n";
+        //__throw_invalid_argument("File not found.");
+        file.close();
+        return -1;
+    }
+
+    cout << "Dataset: #DATA = " << data << " , #DIMENSIONS = " << dim << endl;
     file.close();
+    return 0;
 }
 
 /**
@@ -66,8 +72,10 @@ int loadData(string fname, double **array, int n_dims) {
     if (!inputFile.eof()) {
         cerr << "Could not read file " << fname << endl;
         //__throw_invalid_argument("File not found.");
+        inputFile.close();
         return -1;
     }
+    inputFile.close();
     return 0;
 }
 

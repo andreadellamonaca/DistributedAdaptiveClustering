@@ -4,7 +4,6 @@
 #include <iomanip>
 #include <chrono>
 #include <algorithm>
-#include "alglib/dataanalysis.h"
 #include <armadillo>
 
 /**
@@ -12,7 +11,6 @@
  */
 
 using namespace std;
-using namespace alglib;
 using namespace arma;
 
 /**
@@ -25,7 +23,7 @@ typedef struct cluster_report {
     int *cidx;          /**< A matrix [1, n_data] indicating the membership of data to a cluster through an index. @see create_cidx_matrix for matrix generation */
 } cluster_report;
 
-extern void getDatasetDims(string fname, int *dim, int *data);
+extern int getDatasetDims(string fname, int &dim, int &data);
 extern int loadData(string fname, double **array, int n_dims);
 extern int cluster_size(cluster_report rep, int cluster_id, int n_data);
 extern void create_cidx_matrix(double **data, int n_data, cluster_report instance);
