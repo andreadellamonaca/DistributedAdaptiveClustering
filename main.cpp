@@ -105,6 +105,65 @@ void computePCA(double **covarianceMatrix, double **corrSet, long partitionSize,
         }
     }
 };
+void computeLocalKMeans(int nCluster, long partitionSize, mat centroids, double **subspace, double *weights, double **localsum, double &error) {
+    for (int l = 0; l < nCluster; ++l) {
+        weights[l] += 1;
+        localsum[0][l] += centroids(0, l);
+        localsum[1][l] += centroids(1, l);
+    }
+    for (int k = 0; k < partitionSize; ++k) {
+        int clusterid = mindistCluster(centroids, nCluster, subspace[0][k], subspace[1][k]);
+
+        weights[clusterid] += 1;
+        localsum[0][clusterid] += subspace[0][k];
+        localsum[1][clusterid] += subspace[1][k];
+        error += pow(L2distance(centroids(0, clusterid), centroids(1, clusterid), subspace[0][k], subspace[1][k]), 2);
+    }
+};
+void computeLocalMean_PtsIncluster(double **data, long partitionSize, double *summaries, long nCluster, double *pts_incluster, cluster_report rep) {
+    double weight = 1 / (double) partitionSize;
+    for (int k = 0; k < partitionSize; ++k) {
+        for (int l = 0; l < 2; ++l) {
+            summaries[l] += weight * data[l][k];
+        }
+        for (int m = 0; m < nCluster; ++m) {
+            if (rep.cidx[k] == m) {
+                pts_incluster[m]++;
+            }
+        }
+    }
+};
+void computeNin_Nout(int nCluster, double *pts_incluster, double &Nin, double &Nout) {
+    double nin = 0, nout = 0;
+    for (int m = 0; m < nCluster; ++m) {
+        nin += pts_incluster[m] * (pts_incluster[m] - 1);
+        for (int k = 0; k < nCluster; ++k) {
+            if (k != m) {
+                nout += pts_incluster[m] * pts_incluster[k];
+            }
+        }
+    }
+    Nin = nin / 2;
+    Nout = nout / 2;
+};
+double computeBCSS(int nCluster, double *pts_incluster, mat centroids, double *c_mean) {
+    double bcss = 0;
+    for (int m = 0; m < nCluster; ++m) {
+        bcss += (pts_incluster[m] * L2distance(centroids(0, m), centroids(1, m), c_mean[0], c_mean[1]));
+    }
+    return bcss;
+};
+double computeLocalWCSS(int nCluster, double partitionSize, cluster_report rep, double **subspace) {
+    double wcss = 0;
+    for (int m = 0; m < nCluster; ++m) {
+        for (int k = 0; k < partitionSize; ++k) {
+            if (rep.cidx[k] == m) {
+                wcss += L2distance(rep.centroids(0, m), rep.centroids(1, m), subspace[0][k], subspace[1][k]);
+            }
+        }
+    }
+    return wcss;
+};
 igraph_t generateGeometricGraph(igraph_integer_t n, igraph_real_t radius);
 igraph_t generateBarabasiAlbertGraph(igraph_integer_t n, igraph_real_t power, igraph_integer_t m, igraph_real_t A);
 igraph_t generateErdosRenyiGraph(igraph_integer_t n, igraph_erdos_renyi_t type, igraph_real_t param);
@@ -1256,26 +1315,7 @@ int main(int argc, char **argv) {
                     if(converged[peerID])
                         continue;
 
-                    for (int l = 0; l < nCluster; ++l) {
-                        weights[peerID][l] += 1;
-                        localsum[peerID][0][l] += centroids(0, l, peerID);
-                        localsum[peerID][1][l] += centroids(1, l, peerID);
-                    }
-                    for (int k = 0; k < partitionSize[peerID]; ++k) {
-                        int clusterid = 0;
-                        double mindist = pow(L2distance(centroids(0, 0, peerID), centroids(1, 0, peerID), subspace[peerID][i][0][k], subspace[peerID][i][1][k]), 2);
-                        for (int l = 1; l < nCluster; ++l) {
-                            double dist = pow(L2distance(centroids(0, l, peerID), centroids(1, l, peerID), subspace[peerID][i][0][k], subspace[peerID][i][1][k]), 2);
-                            if ( dist < mindist ) {
-                                mindist = dist;
-                                clusterid = l;
-                            }
-                        }
-                        weights[peerID][clusterid] += 1;
-                        localsum[peerID][0][clusterid] += subspace[peerID][i][0][k];
-                        localsum[peerID][1][clusterid] += subspace[peerID][i][1][k];
-                        error[peerID] += pow(L2distance(centroids(0, clusterid, peerID), centroids(1, clusterid, peerID), subspace[peerID][i][0][k], subspace[peerID][i][1][k]), 2);
-                    }
+                    computeLocalKMeans(nCluster, partitionSize[peerID], centroids.slice(peerID), subspace[peerID][i], weights[peerID], localsum[peerID], error[peerID]);
                 }
 
                 // Reset parameters for convergence estimate
@@ -1451,17 +1491,7 @@ int main(int argc, char **argv) {
                 for (int peerID = 0; peerID < params.peers; peerID++) {
                     pts_incluster[peerID] = &pts_incluster_storage[peerID * nCluster];
                     c_mean[peerID] = &c_mean_storage[peerID * 2];
-                    double weight = 1 / (double) partitionSize[peerID];
-                    for (int k = 0; k < partitionSize[peerID]; ++k) {
-                        for (int l = 0; l < 2; ++l) {
-                            c_mean[peerID][l] += weight * subspace[peerID][i][l][k];
-                        }
-                        for (int m = 0; m < nCluster; ++m) {
-                            if (final[i][peerID].cidx[k] == m) {
-                                pts_incluster[peerID][m]++;
-                            }
-                        }
-                    }
+                    computeLocalMean_PtsIncluster(subspace[peerID][i], partitionSize[peerID], c_mean[peerID], nCluster, pts_incluster[peerID], final[i][peerID]);
                 }
 
                 // Reset parameters for convergence estimate
@@ -1566,22 +1596,9 @@ int main(int argc, char **argv) {
                     exit(-1);
                 }
                 for (int peerID = 0; peerID < params.peers; peerID++) {
-                    for (int m = 0; m < nCluster; ++m) {
-                        nin_storage[peerID] += pts_incluster[peerID][m] * (pts_incluster[peerID][m] - 1);
-                        for (int k = 0; k < nCluster; ++k) {
-                            if (k != m) {
-                                nout_storage[peerID] += pts_incluster[peerID][m] * pts_incluster[peerID][k];
-                            }
-                        }
-                        bcss_storage[peerID] += (pts_incluster[peerID][m] * L2distance(final[i][peerID].centroids.at(0, m), final[i][peerID].centroids.at(1, m), c_mean[peerID][0], c_mean[peerID][1]));
-                        for (int k = 0; k < partitionSize[peerID]; ++k) {
-                            if (final[i][peerID].cidx[k] == m) {
-                                wcss_storage[peerID] += L2distance(final[i][peerID].centroids.at(0, m), final[i][peerID].centroids.at(1, m), subspace[peerID][i][0][k], subspace[peerID][i][1][k]);
-                            }
-                        }
-                    }
-                    nin_storage[peerID] = nin_storage[peerID] / 2;
-                    nout_storage[peerID] = nout_storage[peerID] / 2;
+                    computeNin_Nout(nCluster, pts_incluster[peerID], nin_storage[peerID], nout_storage[peerID]);
+                    bcss_storage[peerID] = computeBCSS(nCluster, pts_incluster[peerID], final[i][peerID].centroids, c_mean[peerID]);
+                    wcss_storage[peerID] = computeLocalWCSS(nCluster, partitionSize[peerID], final[i][peerID], subspace[peerID][i]);
                 }
                 free(c_mean_storage);
                 free(c_mean);
@@ -1659,8 +1676,7 @@ int main(int argc, char **argv) {
                 }
                 for (int peerID = 0; peerID < params.peers; peerID++) {
                     wcss_storage[peerID] = wcss_storage[peerID] / dimestimate[peerID];
-                    double metric = (nout_storage[peerID] * wcss_storage[peerID]) / (nin_storage[peerID] * bcss_storage[peerID]);
-                    final[i][peerID].BetaCV = metric;
+                    final[i][peerID].BetaCV = (nout_storage[peerID] * wcss_storage[peerID]) / (nin_storage[peerID] * bcss_storage[peerID]);
                 }
                 free(nout_storage);
                 free(wcss_storage);

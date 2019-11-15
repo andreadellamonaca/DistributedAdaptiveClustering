@@ -96,6 +96,19 @@ int cluster_size(cluster_report rep, int cluster_id, int n_data) {
     return occurrence;
 }
 
+int mindistCluster(mat centroids, int nCluster, double first_coordinate, double second_coordinate) {
+    double min_dist = L2distance(centroids.at(0,0), centroids.at(1,0), first_coordinate, second_coordinate);
+    int index = 0;
+    for (int j = 1; j < nCluster; ++j) {
+        double new_dist = L2distance(centroids.at(0,j), centroids.at(1,j), first_coordinate, second_coordinate);
+        if (new_dist < min_dist) {
+            min_dist = new_dist;
+            index = j;
+        }
+    }
+    return index;
+}
+
 /**
  * The algorithm creates the array [1, N_DATA] which indicates the membership of each data to a cluster through an integer.
  * @param [in] data a matrix [n_data, n_dims] on which the K-Means run was made.
@@ -104,15 +117,7 @@ int cluster_size(cluster_report rep, int cluster_id, int n_data) {
  */
 void create_cidx_matrix(double **data, int n_data, cluster_report instance) {
     for (int i = 0; i < n_data; ++i) {
-        double min_dist = L2distance(instance.centroids.at(0,0), instance.centroids.at(1,0), data[0][i], data[1][i]);
-        instance.cidx[i] = 0;
-        for (int j = 1; j < instance.k; ++j) {
-            double new_dist = L2distance(instance.centroids.at(0,j), instance.centroids.at(1,j), data[0][i], data[1][i]);
-            if (new_dist < min_dist) {
-                min_dist = new_dist;
-                instance.cidx[i] = j;
-            }
-        }
+        instance.cidx[i] = mindistCluster(instance.centroids, instance.k, data[0][i], data[1][i]);
     }
 }
 

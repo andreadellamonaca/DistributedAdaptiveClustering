@@ -13,58 +13,9 @@
   <component name="ChangeListManager">
     <list default="true" id="424560db-08e6-4a5b-8aff-21bd96c75824" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/CMakeLists.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/adaptive_clustering.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/adaptive_clustering.h" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/alglibinternal.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/alglibinternal.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/alglibinternal.h.gch" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/alglibmisc.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/alglibmisc.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/alglibmisc.h.gch" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/ap.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/ap.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/ap.h.gch" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/dataanalysis.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/dataanalysis.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/dataanalysis.h.gch" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/diffequations.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/diffequations.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/diffequations.h.gch" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/fasttransforms.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/fasttransforms.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/fasttransforms.h.gch" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/integration.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/integration.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/integration.h.gch" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/interpolation.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/interpolation.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/linalg.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/linalg.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/optimization.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/optimization.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/solvers.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/solvers.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/specialfunctions.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/specialfunctions.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/statistics.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/statistics.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/alglib/stdafx.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/CXX.includecache" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/CXX.includecache" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/DependInfo.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/DependInfo.cmake" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/build.make" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/build.make" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/cmake_clean.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/cmake_clean.cmake" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/depend.internal" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/depend.internal" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/depend.make" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/depend.make" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/link.txt" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/link.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/progress.make" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/progress.make" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/Makefile2" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/Makefile2" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/progress.marks" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/progress.marks" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering.cbp" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering.cbp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/Makefile" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/main.cpp" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -206,7 +157,8 @@
       <workItem from="1573488445550" duration="1441000" />
       <workItem from="1573673093020" duration="118000" />
       <workItem from="1573748870562" duration="1685000" />
-      <workItem from="1573750848378" duration="11617000" />
+      <workItem from="1573750848378" duration="11824000" />
+      <workItem from="1573811576412" duration="6587000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -376,7 +328,14 @@
       <option name="project" value="LOCAL" />
       <updated>1573321172797</updated>
     </task>
-    <option name="localTasksCounter" value="25" />
+    <task id="LOCAL-00025" summary="Main refactoring in functions">
+      <created>1573763518228</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1573763518228</updated>
+    </task>
+    <option name="localTasksCounter" value="26" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -416,14 +375,15 @@
     <MESSAGE value="Added some comments" />
     <MESSAGE value="Code optimization" />
     <MESSAGE value="Doxygen comments implementation" />
-    <option name="LAST_COMMIT_MESSAGE" value="Doxygen comments implementation" />
+    <MESSAGE value="Main refactoring in functions" />
+    <option name="LAST_COMMIT_MESSAGE" value="Main refactoring in functions" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
           <url>file://$PROJECT_DIR$/main.cpp</url>
-          <line>107</line>
+          <line>166</line>
           <option name="timeStamp" value="3" />
         </line-breakpoint>
       </breakpoints>
