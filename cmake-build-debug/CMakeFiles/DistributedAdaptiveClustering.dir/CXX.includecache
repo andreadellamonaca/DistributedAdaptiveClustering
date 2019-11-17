@@ -6,6 +6,12 @@
 
 #IncludeRegexTransform: 
 
+/home/andrea/Scrivania/DistributedAdaptiveClustering/adaptive_clustering.cpp
+adaptive_clustering.h
+/home/andrea/Scrivania/DistributedAdaptiveClustering/adaptive_clustering.h
+error.h
+/home/andrea/Scrivania/DistributedAdaptiveClustering/error.h
+
 /home/andrea/Scrivania/DistributedAdaptiveClustering/adaptive_clustering.h
 iostream
 -
@@ -22,15 +28,35 @@ algorithm
 armadillo
 -
 
-/home/andrea/Scrivania/DistributedAdaptiveClustering/main.cpp
+/home/andrea/Scrivania/DistributedAdaptiveClustering/error.cpp
+error.h
+/home/andrea/Scrivania/DistributedAdaptiveClustering/error.h
+
+/home/andrea/Scrivania/DistributedAdaptiveClustering/error.h
 iostream
 -
+
+/home/andrea/Scrivania/DistributedAdaptiveClustering/graph.cpp
+graph.h
+/home/andrea/Scrivania/DistributedAdaptiveClustering/graph.h
+
+/home/andrea/Scrivania/DistributedAdaptiveClustering/graph.h
 igraph/igraph.h
+-
+iostream
+-
+
+/home/andrea/Scrivania/DistributedAdaptiveClustering/main.cpp
+iostream
 -
 cstring
 -
 random
 -
+memory
+-
 adaptive_clustering.h
 /home/andrea/Scrivania/DistributedAdaptiveClustering/adaptive_clustering.h
+graph.h
+/home/andrea/Scrivania/DistributedAdaptiveClustering/graph.h
 

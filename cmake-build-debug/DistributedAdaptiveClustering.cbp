@@ -90,6 +90,18 @@
 		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/adaptive_clustering.h">
 			<Option target="DistributedAdaptiveClustering"/>
 		</Unit>
+		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/error.cpp">
+			<Option target="DistributedAdaptiveClustering"/>
+		</Unit>
+		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/error.h">
+			<Option target="DistributedAdaptiveClustering"/>
+		</Unit>
+		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/graph.cpp">
+			<Option target="DistributedAdaptiveClustering"/>
+		</Unit>
+		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/graph.h">
+			<Option target="DistributedAdaptiveClustering"/>
+		</Unit>
 		<Unit filename="/home/andrea/Scrivania/DistributedAdaptiveClustering/main.cpp">
 			<Option target="DistributedAdaptiveClustering"/>
 		</Unit>

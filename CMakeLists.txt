@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 14)
 find_package(Armadillo REQUIRED)
 include_directories(${ARMADILLO_INCLUDE_DIR})
 
-add_executable(DistributedAdaptiveClustering main.cpp adaptive_clustering.h adaptive_clustering.cpp)
+add_executable(DistributedAdaptiveClustering main.cpp adaptive_clustering.h adaptive_clustering.cpp
+                graph.cpp graph.h error.cpp error.h)
 
 target_link_libraries(DistributedAdaptiveClustering m igraph ${ARMADILLO_LIBRARIES})

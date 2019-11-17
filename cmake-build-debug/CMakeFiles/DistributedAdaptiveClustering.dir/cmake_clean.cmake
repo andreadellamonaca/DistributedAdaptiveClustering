@@ -1,5 +1,7 @@
 file(REMOVE_RECURSE
   "CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o"
+  "CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o"
+  "CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o"
   "CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o"
   "DistributedAdaptiveClustering"
   "DistributedAdaptiveClustering.pdb"

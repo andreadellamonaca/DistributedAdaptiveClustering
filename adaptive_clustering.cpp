@@ -1,10 +1,12 @@
 #include "adaptive_clustering.h"
+#include "error.h"
 
 /**
  * The algorithm calculates the number of rows and columns in a CSV file and saves the information into dim and data.
  * @param [in] fname the path referred to a CSV file.
  * @param [in,out] dim the number of columns in the CSV file.
  * @param [in,out] data the number of rows in the CSV file.
+ * @return 0 if file is read correctly, otherwise -1;
  */
 int getDatasetDims(string fname, int &dim, int &data) {
     dim = 0;
@@ -42,9 +44,12 @@ int getDatasetDims(string fname, int &dim, int &data) {
  * @param [in] fname the number of columns in the CSV file.
  * @param [in,out] array a matrix [n_data, n_dims], in which the CSV file is loaded.
  * @param [in] n_dims the number of columns in the CSV file.
- * @return 0 if the dataset is loaded correctly, otherwise -1.
+ * @return 0 if the dataset is loaded correctly, -2 if array is NULL, otherwise -1.
  */
 int loadData(string fname, double **array, int n_dims) {
+    if (!array) {
+        return NullPointerError(__FUNCTION__);
+    }
     ifstream inputFile(fname);
     int row = 0;
     while (inputFile) {
@@ -85,8 +90,12 @@ int loadData(string fname, double **array, int n_dims) {
  * @param [in] cluster_id a number (between 0 and rep.k) indicating the cluster whereby we want to know the number of data in it.
  * @param [in] n_data number of rows in the dataset matrix.
  * @return an integer indicating the number of data in the cluster with the given id.
+ *          The program exit with -2 if rep.cidx is NULL.
  */
 int cluster_size(cluster_report rep, int cluster_id, int n_data) {
+    if (!rep.cidx) {
+        exit(NullPointerError(__FUNCTION__));
+    }
     int occurrence = 0;
     for (int i = 0; i < n_data; ++i) {
         if (rep.cidx[i] == cluster_id) {
@@ -96,10 +105,20 @@ int cluster_size(cluster_report rep, int cluster_id, int n_data) {
     return occurrence;
 }
 
-int mindistCluster(mat centroids, int nCluster, double first_coordinate, double second_coordinate) {
+/**
+ * This function finds the cluster with the minimum distance to a given point.
+ * @param [in] centroids mat structure [2, nClusters] (from Armadillo).
+ * @param [in] first_coordinate the first component of the point.
+ * @param [in] second_coordinate the second component of the point.
+ * @return an index between 0 and (centroids.n_cols-1). The program exit with -2 if centroids is empty.
+ */
+int mindistCluster(mat centroids, double first_coordinate, double second_coordinate) {
+    if (centroids.is_empty()) {
+        exit(NullPointerError(__FUNCTION__));
+    }
     double min_dist = L2distance(centroids.at(0,0), centroids.at(1,0), first_coordinate, second_coordinate);
     int index = 0;
-    for (int j = 1; j < nCluster; ++j) {
+    for (int j = 1; j < centroids.n_cols; ++j) {
         double new_dist = L2distance(centroids.at(0,j), centroids.at(1,j), first_coordinate, second_coordinate);
         if (new_dist < min_dist) {
             min_dist = new_dist;
@@ -114,11 +133,16 @@ int mindistCluster(mat centroids, int nCluster, double first_coordinate, double 
  * @param [in] data a matrix [n_data, n_dims] on which the K-Means run was made.
  * @param [in] n_data number of rows in the dataset matrix.
  * @param [in,out] instance a cluster_report structure describing the K-Means instance carried out.
+ * @return 0 if success, -2 if data or cidx are NULL or centroids is empty.
  */
-void create_cidx_matrix(double **data, int n_data, cluster_report instance) {
-    for (int i = 0; i < n_data; ++i) {
-        instance.cidx[i] = mindistCluster(instance.centroids, instance.k, data[0][i], data[1][i]);
+int create_cidx_matrix(double **data, int n_data, cluster_report instance) {
+    if (!data || !(instance.cidx) || instance.centroids.is_empty()) {
+        return NullPointerError(__FUNCTION__);
     }
+    for (int i = 0; i < n_data; ++i) {
+        instance.cidx[i] = mindistCluster(instance.centroids, data[0][i], data[1][i]);
+    }
+    return 0;
 }
 
 /**

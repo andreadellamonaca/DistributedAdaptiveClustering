@@ -150,6 +150,60 @@ adaptive_clustering.cpp.s:
 	$(MAKE) -f CMakeFiles/DistributedAdaptiveClustering.dir/build.make CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.s
 .PHONY : adaptive_clustering.cpp.s
 
+error.o: error.cpp.o
+
+.PHONY : error.o
+
+# target to build an object file
+error.cpp.o:
+	$(MAKE) -f CMakeFiles/DistributedAdaptiveClustering.dir/build.make CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o
+.PHONY : error.cpp.o
+
+error.i: error.cpp.i
+
+.PHONY : error.i
+
+# target to preprocess a source file
+error.cpp.i:
+	$(MAKE) -f CMakeFiles/DistributedAdaptiveClustering.dir/build.make CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.i
+.PHONY : error.cpp.i
+
+error.s: error.cpp.s
+
+.PHONY : error.s
+
+# target to generate assembly for a file
+error.cpp.s:
+	$(MAKE) -f CMakeFiles/DistributedAdaptiveClustering.dir/build.make CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.s
+.PHONY : error.cpp.s
+
+graph.o: graph.cpp.o
+
+.PHONY : graph.o
+
+# target to build an object file
+graph.cpp.o:
+	$(MAKE) -f CMakeFiles/DistributedAdaptiveClustering.dir/build.make CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o
+.PHONY : graph.cpp.o
+
+graph.i: graph.cpp.i
+
+.PHONY : graph.i
+
+# target to preprocess a source file
+graph.cpp.i:
+	$(MAKE) -f CMakeFiles/DistributedAdaptiveClustering.dir/build.make CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.i
+.PHONY : graph.cpp.i
+
+graph.s: graph.cpp.s
+
+.PHONY : graph.s
+
+# target to generate assembly for a file
+graph.cpp.s:
+	$(MAKE) -f CMakeFiles/DistributedAdaptiveClustering.dir/build.make CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.s
+.PHONY : graph.cpp.s
+
 main.o: main.cpp.o
 
 .PHONY : main.o
@@ -189,6 +243,12 @@ help:
 	@echo "... adaptive_clustering.o"
 	@echo "... adaptive_clustering.i"
 	@echo "... adaptive_clustering.s"
+	@echo "... error.o"
+	@echo "... error.i"
+	@echo "... error.s"
+	@echo "... graph.o"
+	@echo "... graph.i"
+	@echo "... graph.s"
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"

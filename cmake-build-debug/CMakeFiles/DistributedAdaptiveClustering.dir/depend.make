@@ -3,7 +3,15 @@
 
 CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o: ../adaptive_clustering.cpp
 CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o: ../adaptive_clustering.h
+CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o: ../error.h
+
+CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o: ../error.cpp
+CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o: ../error.h
+
+CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o: ../graph.cpp
+CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o: ../graph.h
 
 CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o: ../adaptive_clustering.h
+CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o: ../graph.h
 CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o: ../main.cpp
 

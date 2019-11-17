@@ -26,7 +26,7 @@ typedef struct cluster_report {
 extern int getDatasetDims(string fname, int &dim, int &data);
 extern int loadData(string fname, double **array, int n_dims);
 extern int cluster_size(cluster_report rep, int cluster_id, int n_data);
-extern int mindistCluster(mat centroids, int nCluster, double first_coordinate, double second_coordinate);
-extern void create_cidx_matrix(double **data, int n_data, cluster_report instance);
+extern int mindistCluster(mat centroids, double first_coordinate, double second_coordinate);
+extern int create_cidx_matrix(double **data, int n_data, cluster_report instance);
 extern double L2distance(double xc, double yc, double x1, double y1);
 extern void data_out(double ****data, long *lastitem, string name, bool ***incircle, int peers, int cs, cluster_report *report);

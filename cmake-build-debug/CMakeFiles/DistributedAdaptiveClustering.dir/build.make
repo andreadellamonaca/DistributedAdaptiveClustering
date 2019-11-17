@@ -83,20 +83,50 @@ CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.s: cmake_fo
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/andrea/Scrivania/DistributedAdaptiveClustering/adaptive_clustering.cpp -o CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.s
 
+CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o: CMakeFiles/DistributedAdaptiveClustering.dir/flags.make
+CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o: ../graph.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/andrea/Scrivania/DistributedAdaptiveClustering/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o"
+	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o -c /home/andrea/Scrivania/DistributedAdaptiveClustering/graph.cpp
+
+CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/andrea/Scrivania/DistributedAdaptiveClustering/graph.cpp > CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.i
+
+CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/andrea/Scrivania/DistributedAdaptiveClustering/graph.cpp -o CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.s
+
+CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o: CMakeFiles/DistributedAdaptiveClustering.dir/flags.make
+CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o: ../error.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/andrea/Scrivania/DistributedAdaptiveClustering/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o"
+	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o -c /home/andrea/Scrivania/DistributedAdaptiveClustering/error.cpp
+
+CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/andrea/Scrivania/DistributedAdaptiveClustering/error.cpp > CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.i
+
+CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/andrea/Scrivania/DistributedAdaptiveClustering/error.cpp -o CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.s
+
 # Object files for target DistributedAdaptiveClustering
 DistributedAdaptiveClustering_OBJECTS = \
 "CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" \
-"CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o"
+"CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" \
+"CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o" \
+"CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o"
 
 # External object files for target DistributedAdaptiveClustering
 DistributedAdaptiveClustering_EXTERNAL_OBJECTS =
 
 DistributedAdaptiveClustering: CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o
 DistributedAdaptiveClustering: CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o
+DistributedAdaptiveClustering: CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o
+DistributedAdaptiveClustering: CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o
 DistributedAdaptiveClustering: CMakeFiles/DistributedAdaptiveClustering.dir/build.make
 DistributedAdaptiveClustering: /usr/lib/x86_64-linux-gnu/libarmadillo.so
 DistributedAdaptiveClustering: CMakeFiles/DistributedAdaptiveClustering.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/andrea/Scrivania/DistributedAdaptiveClustering/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX executable DistributedAdaptiveClustering"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/andrea/Scrivania/DistributedAdaptiveClustering/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Linking CXX executable DistributedAdaptiveClustering"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/DistributedAdaptiveClustering.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

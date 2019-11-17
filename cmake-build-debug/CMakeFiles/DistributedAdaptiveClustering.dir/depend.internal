@@ -4,6 +4,14 @@
 CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o
  /home/andrea/Scrivania/DistributedAdaptiveClustering/adaptive_clustering.cpp
  /home/andrea/Scrivania/DistributedAdaptiveClustering/adaptive_clustering.h
+ /home/andrea/Scrivania/DistributedAdaptiveClustering/error.h
+CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o
+ /home/andrea/Scrivania/DistributedAdaptiveClustering/error.cpp
+ /home/andrea/Scrivania/DistributedAdaptiveClustering/error.h
+CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o
+ /home/andrea/Scrivania/DistributedAdaptiveClustering/graph.cpp
+ /home/andrea/Scrivania/DistributedAdaptiveClustering/graph.h
 CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o
  /home/andrea/Scrivania/DistributedAdaptiveClustering/adaptive_clustering.h
+ /home/andrea/Scrivania/DistributedAdaptiveClustering/graph.h
  /home/andrea/Scrivania/DistributedAdaptiveClustering/main.cpp
