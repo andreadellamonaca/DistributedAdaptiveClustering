@@ -1,7 +1,7 @@
 #include <iostream>
+#include <igraph/igraph.h>
 #include <cstring>
 #include <random>
-#include <memory>
 #include "adaptive_clustering.h"
 #include "graph.h"
 #include "error.h"
@@ -31,24 +31,11 @@ struct Params {
 };
 
 /**
- * Print the needed parameters in order to run the script.
- * @param [in] cmd The name of the script.
+ * Print the needed parameters in order to run the script
+ * @param cmd The name of the script.
  */
 void usage(char* cmd);
-/**
- * This function partitions the n_data between the peers computing the last item for each peer. At the end
- * It computes the size of the partition for each peer.
- * @param [in] n_data The number of data.
- * @param [in] peers The number of peers.
- * @param [in, out] peerLastItem An array [1, peers] containing the index of last item for each peer.
- * @param [in, out] partitionSize An array [1, peers] containing the size of the partition for each peer.
- * @return 0 if success, -2 if peerLastItem or partitionSize are NULL, -3 if the partition is incorrect.
- */
 int partitionData(int n_data, int peers, long *peerLastItem, long *partitionSize);
-/**
- * Print the parameters set for the actual run.
- * @param params The structure containing all the parameters.
- */
 void printUsedParameters(Params params);
 int computeLocalAverage(double **data, int ndims, long start, long end, double *summaries);
 int CenterData(double *summaries, int ndims, long start, long end, double **data);
@@ -58,26 +45,25 @@ bool isCorrDimension(int ndims, int firstDimension, double **pcc);
 int computeCorrUncorrCardinality(double **pcc, int ndims, int &corr_vars, int &uncorr_vars);
 int copyDimension(double **data, int corr_vars, int dim, long start, long end, double **newstorage);
 int computeLocalCovarianceMatrix(long partitionSize, int corr_vars, double **corrSet, double **covarianceMatrix);
-void computePCA(double **covarianceMatrix, double **corrSet, long partitionSize, int corr_vars, double **combine);
-void computeLocalKMeans(long partitionSize, mat centroids, double **subspace, double *weights, double **localsum, double &error);
-void computeLocalC_Mean(double **data, long partitionSize, double *summaries);
-void computeLocalPtsIncluster(long partitionSize, double *pts_incluster, cluster_report rep);
-void computeNin_Nout(int nCluster, double *pts_incluster, double &Nin, double &Nout);
+int computePCA(double **covarianceMatrix, double **oldSpace, long partitionSize, int n_dims, double **newSpace);
+int computeLocalKMeans(long partitionSize, mat centroids, double **subspace, double *weights, double **localsum, double &error);
+int computeLocalC_Mean(double **data, long partitionSize, double *summaries);
+int computeLocalPtsIncluster(long partitionSize, double *pts_incluster, cluster_report rep);
+int computeNin_Nout(int nCluster, double *pts_incluster, double &Nin, double &Nout);
 double computeBCSS(double *pts_incluster, mat centroids, double *c_mean);
 double computeLocalWCSS(long partitionSize, cluster_report rep, double **subspace);
 double computeLocalClusterDistance(long partitionSize, cluster_report rep, int clusterid, bool *discarded, double **subspace);
 int computeLocalClusterDimension(long partitionSize, cluster_report rep, int clusterid, bool *discarded);
 int computeLocalInliers(long partitionSize, cluster_report rep, int clusterid, bool *discarded, double **subspace, double radius);
-void getCountOutliersinSubspace(int uncorr_vars, long partitionSize, int start_idx, bool **discarded, double *outliers);
-void computeAverage(double *x, double y);
-void mergePearsonMatrix(int n_dims, double **pcc_X, double **pcc_Y);
-void mergeCovarianceMatrix(int dimension, double **covar_Y, double **covar_X);
-void mergeSimpleMessages(int dim, double *peerElem, double *neighborElem);
+int getCountOutliersinSubspace(int uncorr_vars, long partitionSize, int start_idx, bool **discarded, double *outliers);
+int computeAverage(double *x, double y);
+int mergeSimpleMessages(int dim, double *peerElem, double *neighborElem);
+int mergeUDiagMatrix(int n_dims, double **UDiagMatrix_X, double **UDiagMatrix_Y);
 double* SimpleAverageConsensus(Params params, igraph_t graph, double* structure);
 double* VectorAverageConsensus(Params params, igraph_t graph, int dim, double** structure);
-double* PearsonMatrixAverageConsensus(Params params, igraph_t graph, int dim, double*** structure);
-double* CovarianceAverageConsensus(Params params, igraph_t graph, int *dim, double*** structure);
-double* CentroidsAverageConsensus(Params params, igraph_t graph, cube structure);
+double* UDiagMatrixAverageConsensus(Params params, igraph_t graph, int *dim, double*** structure);
+double* LocalSumAverageConsensus(Params params, igraph_t graph, int nCluster, double*** structure);
+double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure);
 
 int main(int argc, char **argv) {
 
@@ -275,29 +261,12 @@ int main(int argc, char **argv) {
     igraph_vector_destroy(&result);
 
     // this is used to estimate the number of peers
-    double *dimestimate = (double *) calloc(params.peers, sizeof(double));
-    if (!dimestimate) {
-        cerr << "Malloc error on dimestimate" << endl;
-        exit(-1);
-    }
-    dimestimate[0] = 1;
+    double *dimestimate;
 
+    int Numberofconverged = params.peers;
     bool *converged = (bool *) calloc(params.peers, sizeof(bool));
     if (!converged) {
         cerr << "Malloc error on converged" << endl;
-        exit(-1);
-    }
-    fill_n(converged, params.peers, false);
-
-    int *convRounds = (int *) calloc(params.peers, sizeof(int));
-    if (!convRounds) {
-        cerr << "Malloc error on convRounds" << endl;
-        exit(-1);
-    }
-
-    double *prevestimate = (double *) calloc(params.peers, sizeof(double));
-    if (!prevestimate) {
-        cerr << "Malloc error on prevestimate" << endl;
         exit(-1);
     }
 
@@ -410,7 +379,14 @@ int main(int argc, char **argv) {
     }
 
     VectorAverageConsensus(params, graph, n_dims, squaresum_dims);
-    PearsonMatrixAverageConsensus(params, graph, n_dims, pcc);
+    int *num_dims = (int *) malloc(params.peers * sizeof(int));
+    if (!num_dims) {
+        cerr << "Malloc error on num_dims" << endl;
+        exit(-1);
+    }
+    fill_n(num_dims, params.peers, n_dims);
+    UDiagMatrixAverageConsensus(params, graph, num_dims, pcc);
+    free(num_dims);
 
     for(int peerID = 0; peerID < params.peers; peerID++){
         computePearsonMatrix(pcc[peerID], squaresum_dims[peerID], n_dims);
@@ -494,16 +470,16 @@ int main(int argc, char **argv) {
         };
 
         corr_vars[peerID] = 0, uncorr_vars[peerID] = 0;
-        for (int dimID = 0; dimID < n_dims; ++dimID) {
-            if (isCorrDimension(n_dims, dimID, pcc[peerID])) {
+        for (int i = 0; i < n_dims; ++i) {
+            if (isCorrDimension(n_dims, i, pcc[peerID])) {
                 if (peerID == 0) {
-                    copyDimension(data, corr_vars[peerID], dimID, 0, peerLastItem[peerID], corr[peerID]);
+                    copyDimension(data, corr_vars[peerID], i, 0, peerLastItem[peerID], corr[peerID]);
                 } else {
-                    copyDimension(data, corr_vars[peerID], dimID, peerLastItem[peerID - 1] + 1, peerLastItem[peerID], corr[peerID]);
+                    copyDimension(data, corr_vars[peerID], i, peerLastItem[peerID-1] + 1, peerLastItem[peerID], corr[peerID]);
                 }
                 corr_vars[peerID]++;
             } else {
-                uncorr[peerID][uncorr_vars[peerID]] = dimID;
+                uncorr[peerID][uncorr_vars[peerID]] = i;
                 uncorr_vars[peerID]++;
             }
         }
@@ -558,7 +534,7 @@ int main(int argc, char **argv) {
         computeLocalCovarianceMatrix(partitionSize[peerID], corr_vars[peerID], corr[peerID], covar[peerID]);
     }
 
-    CovarianceAverageConsensus(params, graph, corr_vars, covar);
+    UDiagMatrixAverageConsensus(params, graph, corr_vars, covar);
 
     double ***combine;
     combine = (double ***) malloc(params.peers * sizeof(double **));
@@ -678,7 +654,7 @@ int main(int argc, char **argv) {
             exit(-1);
         }
         fill_n(cs_dims, params.peers, 3);
-        CovarianceAverageConsensus(params, graph, cs_dims, covar);
+        UDiagMatrixAverageConsensus(params, graph, cs_dims, covar);
         free(cs_dims);
 
         for(int peerID = 0; peerID < params.peers; peerID++) {
@@ -750,7 +726,6 @@ int main(int argc, char **argv) {
             // Peer 0 set random centroids
             centroids.slice(0) = randu<mat>(2, nCluster);
             // Broadcast random centroids
-            fill_n(dimestimate, params.peers, 0);
             dimestimate = CentroidsAverageConsensus(params, graph, centroids);
 
             for(int peerID = 0; peerID < params.peers; peerID++){
@@ -803,7 +778,7 @@ int main(int argc, char **argv) {
             fill_n(error, params.peers, 1e9);
 
             // Reset parameters for convergence estimate
-            int Numberofconverged = params.peers;
+            Numberofconverged = params.peers;
             fill_n(converged, params.peers, false);
 
             while( Numberofconverged ) {
@@ -819,86 +794,14 @@ int main(int argc, char **argv) {
                     computeLocalKMeans(partitionSize[peerID], centroids.slice(peerID), subspace[peerID][subspaceID], weights[peerID], localsum[peerID], error[peerID]);
                 }
 
-                // Reset parameters for convergence estimate
-                fill_n(dimestimate, params.peers, 0);
-                dimestimate[0] = 1;
-                int N_converged = params.peers;
-                bool *converged2 = (bool *) calloc(params.peers, sizeof(bool));
-                if (!converged2) {
-                    cerr << "Malloc error on converged2" << endl;
-                    exit(-1);
-                }
-                int rounds = 0;
-
-                while( (params.roundsToExecute < 0 && N_converged) || params.roundsToExecute > 0){
-                    memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
-                    for(int peerID = 0; peerID < params.peers; peerID++){
-                        // check peer convergence
-                        if(params.roundsToExecute < 0 && converged2[peerID])
-                            continue;
-                        // determine peer neighbors
-                        igraph_vector_t neighbors;
-                        igraph_vector_init(&neighbors, 0);
-                        igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
-                        long neighborsSize = igraph_vector_size(&neighbors);
-                        if(fanOut < neighborsSize){
-                            // randomly sample f adjacent vertices
-                            igraph_vector_shuffle(&neighbors);
-                            igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
-                        }
-
-                        neighborsSize = igraph_vector_size(&neighbors);
-                        for(int i1 = 0; i1 < neighborsSize; i1++){
-                            int neighborID = (int) VECTOR(neighbors)[i1];
-                            igraph_integer_t edgeID;
-                            igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
-
-                            for (int clusterID = 0; clusterID < nCluster; ++clusterID) {
-                                computeAverage(&localsum[peerID][0][clusterID], localsum[neighborID][0][clusterID]);
-                                computeAverage(&localsum[peerID][1][clusterID], localsum[neighborID][1][clusterID]);
-                            }
-                            memcpy(localsum[neighborID][0], localsum[peerID][0], 2 * nCluster * sizeof(double));
-                            computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
-                            dimestimate[neighborID] = dimestimate[peerID];
-                        }
-                        igraph_vector_destroy(&neighbors);
-                    }
-
-                    // check local convergence
-                    if (params.roundsToExecute < 0) {
-                        for(int peerID = 0; peerID < params.peers; peerID++){
-                            if(converged2[peerID])
-                                continue;
-                            bool dimestimateconv;
-                            if(prevestimate[peerID])
-                                dimestimateconv = fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) < params.convThreshold;
-                            else
-                                dimestimateconv = false;
-
-                            if(dimestimateconv)
-                                convRounds[peerID]++;
-                            else
-                                convRounds[peerID] = 0;
-
-                            converged2[peerID] = (convRounds[peerID] >= params.convLimit);
-                            if(converged2[peerID]){
-                                N_converged --;
-                            }
-                        }
-                    }
-                    rounds++;
-                    //cerr << "\r Active peers: " << N_converged << " - Rounds: " << rounds2 << "          ";
-                    params.roundsToExecute--;
-                }
-                free(converged2);
-
+                LocalSumAverageConsensus(params, graph, nCluster, localsum);
                 VectorAverageConsensus(params, graph, nCluster, weights);
                 dimestimate = SimpleAverageConsensus(params, graph, error);
 
                 for(int peerID = 0; peerID < params.peers; peerID++){
-                    for (int clusterID = 0; clusterID < nCluster; ++clusterID) {
-                        centroids(0, clusterID, peerID) = localsum[peerID][0][clusterID] / weights[peerID][clusterID];
-                        centroids(1, clusterID, peerID) = localsum[peerID][1][clusterID] / weights[peerID][clusterID];
+                    for (int l = 0; l < nCluster; ++l) {
+                        centroids(0, l, peerID) = localsum[peerID][0][l] / weights[peerID][l];
+                        centroids(1, l, peerID) = localsum[peerID][1][l] / weights[peerID][l];
                     }
                     error[peerID] = error[peerID] / dimestimate[peerID];
                 }
@@ -932,6 +835,11 @@ int main(int argc, char **argv) {
                     final[subspaceID][peerID].cidx = (int *) calloc(partitionSize[peerID], sizeof(int));
                     if (!final[subspaceID][peerID].cidx) {
                         cerr << "Malloc error on final cidx for peer " << peerID << endl;
+                        exit(-1);
+                    }
+                    prev[peerID].cidx = (int *) malloc(partitionSize[peerID] * sizeof(int));
+                    if (!prev[peerID].cidx) {
+                        cerr << "Malloc error on previous cidx for peer " << peerID << endl;
                         exit(-1);
                     }
                 } else {
@@ -987,8 +895,8 @@ int main(int argc, char **argv) {
                 dimestimate = VectorAverageConsensus(params, graph, nCluster, pts_incluster);
 
                 for (int peerID = 0; peerID < params.peers; peerID++) {
-                    for (int clusterID = 0; clusterID < nCluster; ++clusterID) {
-                        pts_incluster[peerID][clusterID] = pts_incluster[peerID][clusterID] / dimestimate[peerID];
+                    for (int m = 0; m < nCluster; ++m) {
+                        pts_incluster[peerID][m] = pts_incluster[peerID][m] / dimestimate[peerID];
                     }
                 }
 
@@ -1086,9 +994,9 @@ int main(int argc, char **argv) {
             cerr << "Malloc error on discardedPts for peer " << peerID << endl;
             exit(-1);
         }
-        for (int subspaceID = 0; subspaceID < uncorr_vars[peerID]; ++subspaceID) {
-            discardedPts[peerID][subspaceID] = (bool *) calloc(partitionSize[peerID], sizeof(bool));
-            if (!discardedPts[peerID][subspaceID]) {
+        for (int m = 0; m < uncorr_vars[peerID]; ++m) {
+            discardedPts[peerID][m] = (bool *) calloc(partitionSize[peerID], sizeof(bool));
+            if (!discardedPts[peerID][m]) {
                 cerr << "Malloc error on discardedPts for peer " << peerID << endl;
                 exit(-1);
             }
@@ -1097,7 +1005,7 @@ int main(int argc, char **argv) {
 
     double *inliers, *prev_inliers, *cluster_dim, *actual_dist, *actual_cluster_dim;
 
-    for (int subspaceID = 0; subspaceID < uncorr_vars[0]; ++subspaceID) {
+    for (int i = 0; i < uncorr_vars[0]; ++i) {
         inliers = (double *) malloc(params.peers * sizeof(double));
         if (!inliers) {
             cerr << "Malloc error on inliers" << endl;
@@ -1114,16 +1022,16 @@ int main(int argc, char **argv) {
             exit(-1);
         }
 
-        for (int clusterId = 0; clusterId < final[subspaceID][0].k; ++clusterId) {
+        for (int l = 0; l < final[i][0].k; ++l) {
             for (int peerID = 0; peerID < params.peers; peerID++) {
-                cluster_dim[peerID] = cluster_size(final[subspaceID][peerID], clusterId, partitionSize[peerID]);
+                cluster_dim[peerID] = cluster_size(final[i][peerID], l, partitionSize[peerID]);
             }
 
             SimpleAverageConsensus(params, graph, cluster_dim);
 
             // Reset parameters for convergence estimate
             fill_n(inliers, params.peers, 0);
-            int Numberofconverged = params.peers;
+            Numberofconverged = params.peers;
             fill_n(converged, params.peers, false);
             actual_dist = (double *) calloc(params.peers, sizeof(double));
             if (!actual_dist) {
@@ -1144,10 +1052,10 @@ int main(int argc, char **argv) {
                     if (converged[peerID])
                         continue;
 
-                    actual_cluster_dim[peerID] = computeLocalClusterDimension(partitionSize[peerID], final[subspaceID][peerID],
-                                                                              clusterId, discardedPts[peerID][subspaceID]);
-                    actual_dist[peerID] = computeLocalClusterDistance(partitionSize[peerID], final[subspaceID][peerID], clusterId,
-                                                                      discardedPts[peerID][subspaceID], subspace[peerID][subspaceID]);
+                    actual_cluster_dim[peerID] = computeLocalClusterDimension(partitionSize[peerID], final[i][peerID],
+                                                                              l, discardedPts[peerID][i]);
+                    actual_dist[peerID] = computeLocalClusterDistance(partitionSize[peerID], final[i][peerID], l,
+                                                                      discardedPts[peerID][i], subspace[peerID][i]);
                 }
 
                 SimpleAverageConsensus(params, graph, actual_dist);
@@ -1155,8 +1063,8 @@ int main(int argc, char **argv) {
 
                 for (int peerID = 0; peerID < params.peers; peerID++) {
                     double dist_mean = actual_dist[peerID] / actual_cluster_dim[peerID];
-                    inliers[peerID] += computeLocalInliers(partitionSize[peerID], final[subspaceID][peerID], clusterId,
-                                                           discardedPts[peerID][subspaceID], subspace[peerID][subspaceID],
+                    inliers[peerID] += computeLocalInliers(partitionSize[peerID], final[i][peerID], l,
+                                                           discardedPts[peerID][i], subspace[peerID][i],
                                                            dist_mean);
                 }
 
@@ -1228,9 +1136,19 @@ int main(int argc, char **argv) {
     // Reset parameters for convergence estimate
     fill_n(dimestimate, params.peers, 0);
     dimestimate[0] = 1;
-    int Numberofconverged = params.peers;
+    Numberofconverged = params.peers;
     fill_n(converged, params.peers, false);
-    fill_n(convRounds, params.peers, 0);
+
+    double *prevestimate = (double *) calloc(params.peers, sizeof(double));
+    if (!prevestimate) {
+        cerr << "Malloc error on prevestimate" << endl;
+        exit(-1);
+    }
+    int *convRounds = (int *) calloc(params.peers, sizeof(int));
+    if (!convRounds) {
+        cerr << "Malloc error on convRounds" << endl;
+        exit(-1);
+    }
     int rounds = 0;
 
     while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
@@ -1256,8 +1174,8 @@ int main(int argc, char **argv) {
                 igraph_integer_t edgeID;
                 igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
 
-                for (int j = 0; j < tot_num_data[peerID]; ++j) {
-                    computeAverage(&global_outliers[peerID][j], global_outliers[neighborID][j]);
+                for (int q = 0; q < tot_num_data[peerID]; ++q) {
+                    computeAverage(&global_outliers[peerID][q], global_outliers[neighborID][q]);
                 }
                 memcpy(global_outliers[neighborID], global_outliers[peerID], tot_num_data[peerID] * sizeof(double));
                 computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
@@ -1303,8 +1221,8 @@ int main(int argc, char **argv) {
     for (int i = 0; i < tot_num_data[0]; ++i) {
         if (global_outliers[0][i] >= std::round(uncorr_vars[0] * params.percentageSubspaces)) {
             cout << i << ") ";
-            for (int j = 0; j < n_dims; ++j) {
-                cout << data[i][j] << " ";
+            for (int l = 0; l < n_dims; ++l) {
+                cout << data[i][l] << " ";
             }
             cout << "(" << global_outliers[0][i] << ")" << endl;
         }
@@ -1411,11 +1329,9 @@ int computeLocalAverage(double **data, int ndims, long start, long end, double *
         return NullPointerError(__FUNCTION__);
     }
 
-    double weight;
-    if (end-start == 0) {
-        weight = 0;
-    } else {
-        weight = 1 / (double) end-start;
+    double weight = 0;
+    if ((end-start)) {
+        weight = 1 / (double) (end-start);
     }
     for (int i = start; i <= end; ++i) {
         for (int j = 0; j < ndims; ++j) {
@@ -1463,7 +1379,6 @@ int computePearsonMatrix(double **pcc, double *squaresum_dims, int ndims) {
     for (int l = 0; l < ndims; ++l) {
         for (int m = l + 1; m < ndims; ++m) {
             pcc[l][m] = pcc[l][m] / sqrt(squaresum_dims[l] * squaresum_dims[m]);
-            pcc[m][l] = pcc[l][m];
         }
     }
     return 0;
@@ -1518,15 +1433,19 @@ int computeLocalCovarianceMatrix(long partitionSize, int corr_vars, double **cor
             for (int k = 0; k < partitionSize; ++k) {
                 covarianceMatrix[i][j] += corrSet[i][k] * corrSet[j][k];
             }
-            if (partitionSize != 0 || (partitionSize - 1) != 0) {
-                covarianceMatrix[i][j] = covarianceMatrix[i][j] / (partitionSize - 1);
+            if (partitionSize != 0) {
+                covarianceMatrix[i][j] = covarianceMatrix[i][j] / partitionSize;
             }
         }
     }
+    return 0;
 }
 
-void computePCA(double **covarianceMatrix, double **corrSet, long partitionSize, int corr_vars, double **combine) {
-    mat cov_mat(covarianceMatrix[0], corr_vars, corr_vars);
+int computePCA(double **covarianceMatrix, double **oldSpace, long partitionSize, int n_dims, double **newSpace) {
+    if (!covarianceMatrix || !oldSpace || !newSpace) {
+        return NullPointerError(__FUNCTION__);
+    }
+    mat cov_mat(covarianceMatrix[0], n_dims, n_dims);
     vec eigval;
     mat eigvec;
     eig_sym(eigval, eigvec, cov_mat);
@@ -1534,16 +1453,21 @@ void computePCA(double **covarianceMatrix, double **corrSet, long partitionSize,
     for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < partitionSize; ++j) {
             double value = 0.0;
-            for (int k = 0; k < corr_vars; ++k) {
-                int col = corr_vars - i - 1;
-                value += corrSet[k][j] * eigvec(k, col);
+            for (int k = 0; k < n_dims; ++k) {
+                int col = n_dims - i - 1;
+                value += oldSpace[k][j] * eigvec(k, col);
             }
-            combine[i][j] = value;
+            newSpace[i][j] = value;
         }
     }
+    return 0;
 }
 
-void computeLocalKMeans(long partitionSize, mat centroids, double **subspace, double *weights, double **localsum, double &error) {
+int computeLocalKMeans(long partitionSize, mat centroids, double **subspace, double *weights, double **localsum, double &error) {
+    if (!subspace || !weights || !localsum || !(&error) || centroids.is_empty()) {
+        return NullPointerError(__FUNCTION__);
+    }
+
     for (int l = 0; l < centroids.n_cols; ++l) {
         weights[l] += 1;
         localsum[0][l] += centroids(0, l);
@@ -1557,24 +1481,42 @@ void computeLocalKMeans(long partitionSize, mat centroids, double **subspace, do
         localsum[1][clusterid] += subspace[1][k];
         error += pow(L2distance(centroids(0, clusterid), centroids(1, clusterid), subspace[0][k], subspace[1][k]), 2);
     }
+    return 0;
 }
 
-void computeLocalC_Mean(double **data, long partitionSize, double *summaries) {
-    double weight = 1 / (double) partitionSize;
+int computeLocalC_Mean(double **data, long partitionSize, double *summaries) {
+    if (!data || !summaries) {
+        return NullPointerError(__FUNCTION__);
+    }
+
+    double weight = 0;
+    if (partitionSize) {
+        weight = 1 / (double) partitionSize;
+    }
     for (int k = 0; k < partitionSize; ++k) {
         for (int l = 0; l < 2; ++l) {
             summaries[l] += weight * data[l][k];
         }
     }
+    return 0;
 }
 
-void computeLocalPtsIncluster(long partitionSize, double *pts_incluster, cluster_report rep) {
+int computeLocalPtsIncluster(long partitionSize, double *pts_incluster, cluster_report rep) {
+    if (!pts_incluster || !(rep.cidx)) {
+        return NullPointerError(__FUNCTION__);
+    }
+
     for (int k = 0; k < partitionSize; ++k) {
         pts_incluster[rep.cidx[k]]++;
     }
+    return 0;
 }
 
-void computeNin_Nout(int nCluster, double *pts_incluster, double &Nin, double &Nout) {
+int computeNin_Nout(int nCluster, double *pts_incluster, double &Nin, double &Nout) {
+    if (!pts_incluster || !(&Nin) || !(&Nout)) {
+        return NullPointerError(__FUNCTION__);
+    }
+
     double nin = 0, nout = 0;
     for (int m = 0; m < nCluster; ++m) {
         nin += pts_incluster[m] * (pts_incluster[m] - 1);
@@ -1586,9 +1528,14 @@ void computeNin_Nout(int nCluster, double *pts_incluster, double &Nin, double &N
     }
     Nin = nin / 2;
     Nout = nout / 2;
+    return 0;
 }
 
 double computeBCSS(double *pts_incluster, mat centroids, double *c_mean) {
+    if (!pts_incluster || !c_mean || centroids.is_empty()) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+
     double bcss = 0;
     for (int m = 0; m < centroids.n_cols; ++m) {
         bcss += (pts_incluster[m] * L2distance(centroids(0, m), centroids(1, m), c_mean[0], c_mean[1]));
@@ -1597,6 +1544,10 @@ double computeBCSS(double *pts_incluster, mat centroids, double *c_mean) {
 }
 
 double computeLocalWCSS(long partitionSize, cluster_report rep, double **subspace) {
+    if (!subspace || !(rep.cidx) || rep.centroids.is_empty()) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+
     double wcss = 0;
     for (int m = 0; m < rep.centroids.n_cols; ++m) {
         for (int k = 0; k < partitionSize; ++k) {
@@ -1609,6 +1560,10 @@ double computeLocalWCSS(long partitionSize, cluster_report rep, double **subspac
 }
 
 double computeLocalClusterDistance(long partitionSize, cluster_report rep, int clusterid, bool *discarded, double **subspace) {
+    if (!discarded || !subspace || !(rep.cidx) || rep.centroids.is_empty()) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+
     double dist = 0.0;
     for (int k = 0; k < partitionSize; ++k) {
         if (rep.cidx[k] == clusterid && !(discarded[k]) ) {
@@ -1619,6 +1574,10 @@ double computeLocalClusterDistance(long partitionSize, cluster_report rep, int c
 }
 
 int computeLocalClusterDimension(long partitionSize, cluster_report rep, int clusterid, bool *discarded) {
+    if (!discarded || !(rep.cidx)) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+
     int count = 0;
     for (int k = 0; k < partitionSize; ++k) {
         if (rep.cidx[k] == clusterid && !(discarded[k]) ) {
@@ -1629,6 +1588,10 @@ int computeLocalClusterDimension(long partitionSize, cluster_report rep, int clu
 }
 
 int computeLocalInliers(long partitionSize, cluster_report rep, int clusterid, bool *discarded, double **subspace, double radius) {
+    if (!discarded || !subspace || !(rep.cidx) || rep.centroids.is_empty()) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+
     int count = 0;
     for (int k = 0; k < partitionSize; ++k) {
         if (rep.cidx[k] == clusterid && !(discarded[k]) ) {
@@ -1642,7 +1605,11 @@ int computeLocalInliers(long partitionSize, cluster_report rep, int clusterid, b
     return count;
 }
 
-void getCountOutliersinSubspace(int uncorr_vars, long partitionSize, int start_idx, bool **discarded, double *outliers) {
+int getCountOutliersinSubspace(int uncorr_vars, long partitionSize, int start_idx, bool **discarded, double *outliers) {
+    if (!discarded || !(outliers)) {
+        return NullPointerError(__FUNCTION__);
+    }
+
     for (int k = 0; k < partitionSize; ++k) {
         for (int j = 0; j < uncorr_vars; ++j) {
             if (!discarded[j][k]) {
@@ -1650,64 +1617,75 @@ void getCountOutliersinSubspace(int uncorr_vars, long partitionSize, int start_i
             }
         }
     }
+    return 0;
 }
 
-void computeAverage(double *x, double y) {
+int computeAverage(double *x, double y) {
+    if (!x) {
+        return NullPointerError(__FUNCTION__);
+    }
     *x = (*x+y)/2.0;
+    return 0;
 }
 
-void mergePearsonMatrix(int n_dims, double **pcc_X, double **pcc_Y) {
-    for (int l = 0; l < n_dims; ++l) {
-        for (int m = l + 1; m < n_dims; ++m) {
-            computeAverage(&pcc_X[l][m], pcc_Y[l][m]);
-        }
+int mergeSimpleMessages(int dim, double *peerElem, double *neighborElem) {
+    if (!peerElem || !neighborElem) {
+        return NullPointerError(__FUNCTION__);
     }
-}
-
-void mergeCovarianceMatrix(int dimension, double **covar_Y, double **covar_X) {
-    for (int l = 0; l < dimension; ++l) {
-        for (int k = l; k < dimension; ++k) {
-            computeAverage(&covar_X[l][k], covar_Y[l][k]);
-            covar_X[k][l] = covar_X[l][k];
-        }
-    }
-}
-
-void mergeSimpleMessages(int dim, double *peerElem, double *neighborElem) {
     for (int j = 0; j < dim; ++j) {
         computeAverage(&peerElem[j], neighborElem[j]);
     }
     memcpy(neighborElem, peerElem, dim * sizeof(double));
+    return 0;
+}
+
+int mergeUDiagMatrix(int n_dims, double **UDiagMatrix_X, double **UDiagMatrix_Y) {
+    if (!UDiagMatrix_X || !UDiagMatrix_Y) {
+        return NullPointerError(__FUNCTION__);
+    }
+
+    for (int l = 0; l < n_dims; ++l) {
+        for (int m = l; m < n_dims; ++m) {
+            computeAverage(&UDiagMatrix_X[l][m], UDiagMatrix_Y[l][m]);
+            UDiagMatrix_X[m][l] = UDiagMatrix_X[l][m];
+        }
+    }
+    return 0;
 }
 
 double* SimpleAverageConsensus(Params params, igraph_t graph, double* structure) {
-    // this is used to estimate the number of peers
-    double *dimestimate = (double *) calloc(params.peers, sizeof(double));
+    if (!structure) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+    double *dimestimate = nullptr, *prevestimate = nullptr;
+    bool *converged = nullptr;
+    int *convRounds = nullptr;
+    int Numberofconverged = params.peers;
+    int rounds = 0;
+
+    dimestimate = (double *) calloc(params.peers, sizeof(double));
     if (!dimestimate) {
-        cerr << "Malloc error on dimestimate" << endl;
-        exit(-1);
+        exit(memoryError(__FUNCTION__));
     }
     dimestimate[0] = 1;
 
-    int Numberofconverged = params.peers;
-    bool *converged = (bool *) calloc(params.peers, sizeof(bool));
+    converged = (bool *) calloc(params.peers, sizeof(bool));
     if (!converged) {
-        cerr << "Malloc error on converged" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     fill_n(converged, params.peers, false);
 
-    int *convRounds = (int *) calloc(params.peers, sizeof(int));
+    convRounds = (int *) calloc(params.peers, sizeof(int));
     if (!convRounds) {
-        cerr << "Malloc error on convRounds" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
-    int rounds = 0;
 
-    double *prevestimate = (double *) calloc(params.peers, sizeof(double));
+    prevestimate = (double *) calloc(params.peers, sizeof(double));
     if (!prevestimate) {
-        cerr << "Malloc error on prevestimate" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
 
     while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
@@ -1767,37 +1745,54 @@ double* SimpleAverageConsensus(Params params, igraph_t graph, double* structure)
         //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
         params.roundsToExecute--;
     }
+
+    ON_EXIT:
+
+    if (converged != nullptr)
+        free(converged), converged = nullptr;
+
+    if (convRounds != nullptr)
+        free(convRounds), convRounds = nullptr;
+
+    if (prevestimate != nullptr)
+        free(prevestimate), prevestimate = nullptr;
+
     return dimestimate;
 }
 
 double* VectorAverageConsensus(Params params, igraph_t graph, int dim, double** structure) {
-    // this is used to estimate the number of peers
-    double *dimestimate = (double *) calloc(params.peers, sizeof(double));
+    if (!structure) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+    double *dimestimate = nullptr, *prevestimate = nullptr;
+    bool *converged = nullptr;
+    int *convRounds = nullptr;
+    int Numberofconverged = params.peers;
+    int rounds = 0;
+
+    dimestimate = (double *) calloc(params.peers, sizeof(double));
     if (!dimestimate) {
-        cerr << "Malloc error on dimestimate" << endl;
-        exit(-1);
+        exit(memoryError(__FUNCTION__));
     }
     dimestimate[0] = 1;
 
-    int Numberofconverged = params.peers;
-    bool *converged = (bool *) calloc(params.peers, sizeof(bool));
+    converged = (bool *) calloc(params.peers, sizeof(bool));
     if (!converged) {
-        cerr << "Malloc error on converged" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     fill_n(converged, params.peers, false);
 
-    int *convRounds = (int *) calloc(params.peers, sizeof(int));
+    convRounds = (int *) calloc(params.peers, sizeof(int));
     if (!convRounds) {
-        cerr << "Malloc error on convRounds" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
-    int rounds = 0;
 
-    double *prevestimate = (double *) calloc(params.peers, sizeof(double));
+    prevestimate = (double *) calloc(params.peers, sizeof(double));
     if (!prevestimate) {
-        cerr << "Malloc error on prevestimate" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
 
     while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
@@ -1856,37 +1851,54 @@ double* VectorAverageConsensus(Params params, igraph_t graph, int dim, double** 
         //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
         params.roundsToExecute--;
     }
+
+    ON_EXIT:
+
+    if (converged != nullptr)
+        free(converged), converged = nullptr;
+
+    if (convRounds != nullptr)
+        free(convRounds), convRounds = nullptr;
+
+    if (prevestimate != nullptr)
+        free(prevestimate), prevestimate = nullptr;
+
     return dimestimate;
 }
 
-double* PearsonMatrixAverageConsensus(Params params, igraph_t graph, int dim, double*** structure) {
-    // this is used to estimate the number of peers
-    double *dimestimate = (double *) calloc(params.peers, sizeof(double));
+double* UDiagMatrixAverageConsensus(Params params, igraph_t graph, int *dim, double*** structure) {
+    if (!structure) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+    double *dimestimate = nullptr, *prevestimate = nullptr;
+    bool *converged = nullptr;
+    int *convRounds = nullptr;
+    int Numberofconverged = params.peers;
+    int rounds = 0;
+
+    dimestimate = (double *) calloc(params.peers, sizeof(double));
     if (!dimestimate) {
-        cerr << "Malloc error on dimestimate" << endl;
-        exit(-1);
+        exit(memoryError(__FUNCTION__));
     }
     dimestimate[0] = 1;
 
-    int Numberofconverged = params.peers;
-    bool *converged = (bool *) calloc(params.peers, sizeof(bool));
+    converged = (bool *) calloc(params.peers, sizeof(bool));
     if (!converged) {
-        cerr << "Malloc error on converged" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     fill_n(converged, params.peers, false);
 
-    int *convRounds = (int *) calloc(params.peers, sizeof(int));
+    convRounds = (int *) calloc(params.peers, sizeof(int));
     if (!convRounds) {
-        cerr << "Malloc error on convRounds" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
-    int rounds = 0;
 
-    double *prevestimate = (double *) calloc(params.peers, sizeof(double));
+    prevestimate = (double *) calloc(params.peers, sizeof(double));
     if (!prevestimate) {
-        cerr << "Malloc error on prevestimate" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
 
     while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
@@ -1912,96 +1924,7 @@ double* PearsonMatrixAverageConsensus(Params params, igraph_t graph, int dim, do
                 igraph_integer_t edgeID;
                 igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
 
-                mergePearsonMatrix(dim, structure[peerID], structure[neighborID]);
-                computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
-                dimestimate[neighborID] = dimestimate[peerID];
-            }
-            igraph_vector_destroy(&neighbors);
-        }
-
-        // check local convergence
-        if (params.roundsToExecute < 0) {
-            for(int peerID = 0; peerID < params.peers; peerID++){
-                if(converged[peerID])
-                    continue;
-                bool dimestimateconv;
-                if(prevestimate[peerID])
-                    dimestimateconv = fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) < params.convThreshold;
-                else
-                    dimestimateconv = false;
-
-                if(dimestimateconv)
-                    convRounds[peerID]++;
-                else
-                    convRounds[peerID] = 0;
-
-                converged[peerID] = (convRounds[peerID] >= params.convLimit);
-                if(converged[peerID]){
-                    Numberofconverged --;
-                }
-            }
-        }
-        rounds++;
-        //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
-        params.roundsToExecute--;
-    }
-    return dimestimate;
-}
-
-double* CovarianceAverageConsensus(Params params, igraph_t graph, int *dim, double*** structure) {
-    // this is used to estimate the number of peers
-    double *dimestimate = (double *) calloc(params.peers, sizeof(double));
-    if (!dimestimate) {
-        cerr << "Malloc error on dimestimate" << endl;
-        exit(-1);
-    }
-    dimestimate[0] = 1;
-
-    int Numberofconverged = params.peers;
-    bool *converged = (bool *) calloc(params.peers, sizeof(bool));
-    if (!converged) {
-        cerr << "Malloc error on converged" << endl;
-        exit(-1);
-    }
-    fill_n(converged, params.peers, false);
-
-    int *convRounds = (int *) calloc(params.peers, sizeof(int));
-    if (!convRounds) {
-        cerr << "Malloc error on convRounds" << endl;
-        exit(-1);
-    }
-    int rounds = 0;
-
-    double *prevestimate = (double *) calloc(params.peers, sizeof(double));
-    if (!prevestimate) {
-        cerr << "Malloc error on prevestimate" << endl;
-        exit(-1);
-    }
-
-    while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
-        memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
-        for(int peerID = 0; peerID < params.peers; peerID++){
-            // check peer convergence
-            if(params.roundsToExecute < 0 && converged[peerID])
-                continue;
-            // determine peer neighbors
-            igraph_vector_t neighbors;
-            igraph_vector_init(&neighbors, 0);
-            igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
-            long neighborsSize = igraph_vector_size(&neighbors);
-            if(params.fanOut < neighborsSize){
-                // randomly sample f adjacent vertices
-                igraph_vector_shuffle(&neighbors);
-                igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
-            }
-
-            neighborsSize = igraph_vector_size(&neighbors);
-            for(int i = 0; i < neighborsSize; i++){
-                int neighborID = (int) VECTOR(neighbors)[i];
-                igraph_integer_t edgeID;
-                igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
-
-                mergeCovarianceMatrix(dim[peerID], structure[neighborID], structure[peerID]);
+                mergeUDiagMatrix(dim[peerID], structure[peerID], structure[peerID]);
                 memcpy(structure[neighborID][0], structure[peerID][0], dim[peerID] * dim[peerID] * sizeof(double));
                 computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
                 dimestimate[neighborID] = dimestimate[peerID];
@@ -2035,37 +1958,164 @@ double* CovarianceAverageConsensus(Params params, igraph_t graph, int *dim, doub
         //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
         params.roundsToExecute--;
     }
+
+    ON_EXIT:
+
+    if (converged != nullptr)
+        free(converged), converged = nullptr;
+
+    if (convRounds != nullptr)
+        free(convRounds), convRounds = nullptr;
+
+    if (prevestimate != nullptr)
+        free(prevestimate), prevestimate = nullptr;
+
     return dimestimate;
 }
 
-double* CentroidsAverageConsensus(Params params, igraph_t graph, cube structure) {
-    // this is used to estimate the number of peers
-    double *dimestimate = (double *) calloc(params.peers, sizeof(double));
+double* LocalSumAverageConsensus(Params params, igraph_t graph, int nCluster, double*** structure) {
+    if (!structure) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+    double *dimestimate = nullptr, *prevestimate = nullptr;
+    bool *converged = nullptr;
+    int *convRounds = nullptr;
+    int Numberofconverged = params.peers;
+    int rounds = 0;
+
+    dimestimate = (double *) calloc(params.peers, sizeof(double));
     if (!dimestimate) {
-        cerr << "Malloc error on dimestimate" << endl;
-        exit(-1);
+        exit(memoryError(__FUNCTION__));
     }
     dimestimate[0] = 1;
 
-    int Numberofconverged = params.peers;
-    bool *converged = (bool *) calloc(params.peers, sizeof(bool));
+    converged = (bool *) calloc(params.peers, sizeof(bool));
     if (!converged) {
-        cerr << "Malloc error on converged" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     fill_n(converged, params.peers, false);
 
-    int *convRounds = (int *) calloc(params.peers, sizeof(int));
+    convRounds = (int *) calloc(params.peers, sizeof(int));
     if (!convRounds) {
-        cerr << "Malloc error on convRounds" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
+
+    prevestimate = (double *) calloc(params.peers, sizeof(double));
+    if (!prevestimate) {
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
+    }
+
+    while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
+        memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
+        for(int peerID = 0; peerID < params.peers; peerID++){
+            // check peer convergence
+            if(params.roundsToExecute < 0 && converged[peerID])
+                continue;
+            // determine peer neighbors
+            igraph_vector_t neighbors;
+            igraph_vector_init(&neighbors, 0);
+            igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
+            long neighborsSize = igraph_vector_size(&neighbors);
+            if(params.fanOut < neighborsSize){
+                // randomly sample f adjacent vertices
+                igraph_vector_shuffle(&neighbors);
+                igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
+            }
+
+            neighborsSize = igraph_vector_size(&neighbors);
+            for(int i = 0; i < neighborsSize; i++){
+                int neighborID = (int) VECTOR(neighbors)[i];
+                igraph_integer_t edgeID;
+                igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
+
+                for (int l = 0; l < nCluster; ++l) {
+                    computeAverage(&structure[peerID][0][l], structure[neighborID][0][l]);
+                    computeAverage(&structure[peerID][1][l], structure[neighborID][1][l]);
+                }
+                memcpy(structure[neighborID][0], structure[peerID][0], 2 * nCluster * sizeof(double));
+                computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
+                dimestimate[neighborID] = dimestimate[peerID];
+            }
+            igraph_vector_destroy(&neighbors);
+        }
+
+        // check local convergence
+        if (params.roundsToExecute < 0) {
+            for(int peerID = 0; peerID < params.peers; peerID++){
+                if(converged[peerID])
+                    continue;
+                bool dimestimateconv;
+                if(prevestimate[peerID])
+                    dimestimateconv = fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) < params.convThreshold;
+                else
+                    dimestimateconv = false;
+
+                if(dimestimateconv)
+                    convRounds[peerID]++;
+                else
+                    convRounds[peerID] = 0;
+
+                converged[peerID] = (convRounds[peerID] >= params.convLimit);
+                if(converged[peerID]){
+                    Numberofconverged --;
+                }
+            }
+        }
+        rounds++;
+        //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
+        params.roundsToExecute--;
+    }
+
+    ON_EXIT:
+
+    if (converged != nullptr)
+        free(converged), converged = nullptr;
+
+    if (convRounds != nullptr)
+        free(convRounds), convRounds = nullptr;
+
+    if (prevestimate != nullptr)
+        free(prevestimate), prevestimate = nullptr;
+
+    return dimestimate;
+}
+
+double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure) {
+    if (structure.is_empty()) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+    double *dimestimate = nullptr, *prevestimate = nullptr;
+    bool *converged = nullptr;
+    int *convRounds = nullptr;
+    int Numberofconverged = params.peers;
     int rounds = 0;
 
-    double *prevestimate = (double *) calloc(params.peers, sizeof(double));
+    dimestimate = (double *) calloc(params.peers, sizeof(double));
+    if (!dimestimate) {
+        exit(memoryError(__FUNCTION__));
+    }
+    dimestimate[0] = 1;
+
+    converged = (bool *) calloc(params.peers, sizeof(bool));
+    if (!converged) {
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
+    }
+    fill_n(converged, params.peers, false);
+
+    convRounds = (int *) calloc(params.peers, sizeof(int));
+    if (!convRounds) {
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
+    }
+
+    prevestimate = (double *) calloc(params.peers, sizeof(double));
     if (!prevestimate) {
-        cerr << "Malloc error on prevestimate" << endl;
-        exit(-1);
+        memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
 
     while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
@@ -2125,6 +2175,17 @@ double* CentroidsAverageConsensus(Params params, igraph_t graph, cube structure)
         //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
         params.roundsToExecute--;
     }
+
+    ON_EXIT:
+
+    if (converged != nullptr)
+        free(converged), converged = nullptr;
+
+    if (convRounds != nullptr)
+        free(convRounds), convRounds = nullptr;
+
+    if (prevestimate != nullptr)
+        free(prevestimate), prevestimate = nullptr;
 
     return dimestimate;
 }

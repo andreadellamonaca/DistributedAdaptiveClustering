@@ -12,6 +12,7 @@ CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o: ../graph.cpp
 CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o: ../graph.h
 
 CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o: ../adaptive_clustering.h
+CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o: ../error.h
 CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o: ../graph.h
 CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o: ../main.cpp
 
