@@ -30,8 +30,22 @@ struct Params {
     double       percentageSubspaces; /**< The percentage of subspace in which a point must be outlier to be evaluated as general outlier. */
 };
 
+chrono::high_resolution_clock::time_point t1, t2;
+
 /**
- * Print the needed parameters in order to run the script
+ * This function saves the actual time into global variable t1.
+ */
+void StartTheClock();
+
+
+/**
+ * This function saves the actual time into global variable t2
+ * and it computes the difference between t1 and t2.
+ * @return the difference between t1 and t2
+ */
+double StopTheClock();
+/**
+ * Print the needed parameters in order to run the script.
  * @param cmd The name of the script.
  */
 void usage(char* cmd);
@@ -73,7 +87,6 @@ int main(int argc, char **argv) {
     long *partitionSize = NULL; // size of a peer partition
     int peers = 10; // number of peers
     int fanOut = 3; //fan-out of peers
-    uint32_t seed = 16033099; // seed for the PRNG
     int graphType = 2; // graph distribution: 1 geometric 2 Barabasi-Albert 3 Erdos-Renyi 4 regular (clique)
     double convThreshold = 0.001; // local convergence tolerance
     int convLimit = 3; // number of consecutive rounds in which a peer must locally converge
@@ -85,10 +98,12 @@ int main(int argc, char **argv) {
     double percentageSubspaces = 0.8; // percentage of subspaces in which a point must be outlier to be evaluated as general outlier
 
     Params          params;
-    bool            outputOnFile = false;
+    bool            outputOnFile;
     string          inputFilename = "../datasets/Iris.csv";
     string          outputFilename;
     igraph_t        graph;
+    int             programStatus = 0;
+    double          elapsed;
 
     /*** Parse Command-Line Parameters ***/
     for (int i = 1; i < argc; ++i) {
@@ -105,7 +120,7 @@ int main(int argc, char **argv) {
                 cerr << "Missing fan-out parameter." << endl;
                 return -1;
             }
-            fanOut = stol(argv[i]);;
+            fanOut = stol(argv[i]);
         } else if (strcmp(argv[i], "-d") == 0) {
             i++;
             if (i >= argc) {
@@ -188,19 +203,43 @@ int main(int argc, char **argv) {
             return -1;
         }
     }
+    //Structures used for consensus or convergence procedures
+    double *dimestimate = nullptr, *prevestimate = nullptr;
+    bool *converged = nullptr;
+    int *convRounds = nullptr, Numberofconverged, rounds = 0;
+    //Structures used for dataset loading and standardization
+    double *data_storage = nullptr, **data = nullptr, *avg_storage = nullptr, **avgsummaries = nullptr;
+    //Structures used for pcc and covariance computation
+    double *pcc_storage = nullptr, **pcc_i = nullptr, ***pcc = nullptr, **squaresum_dims = nullptr,
+    *squaresum_dims_storage = nullptr, *covar_storage = nullptr, **covar_i = nullptr, ***covar = nullptr;
+    int *num_dims = nullptr;
+    //Structures used for Partitioning, PCA and Subspaces
+    double ***combine = nullptr, ***corr = nullptr, ****subspace = nullptr;
+    int *cs_dims = nullptr, *uncorr_vars = nullptr, *corr_vars = nullptr, **uncorr = nullptr;
+    //Structures used for clustering
+    double *localsum_storage = nullptr, **localsum_i = nullptr, ***localsum = nullptr, *weights_storage = nullptr,
+    **weights = nullptr, *prev_err = nullptr, *error = nullptr;
+    cluster_report *final_i = nullptr, **final = nullptr, *prev = nullptr;
+    //Structures used for BetaCV
+    double *pts_incluster_storage = nullptr, **pts_incluster = nullptr, *c_mean_storage = nullptr, **c_mean = nullptr,
+    *bcss_storage = nullptr, *wcss_storage = nullptr, *nin_storage = nullptr, *nout_storage = nullptr;
+    //Structures used for outlier identification
+    double *inliers = nullptr, *prev_inliers = nullptr, *cluster_dim = nullptr, *actual_dist = nullptr,
+    *actual_cluster_dim = nullptr, *tot_num_data = nullptr, **global_outliers = nullptr;
+    bool ***discardedPts = nullptr;
 
     /*** Dataset Loading ***/
     getDatasetDims(inputFilename, n_dims, n_data);
 
-    double *data_storage = (double *) malloc(n_dims * n_data * sizeof(double));
+    data_storage = (double *) malloc(n_dims * n_data * sizeof(double));
     if (!data_storage) {
-        cerr << "Malloc error on data_storage" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        return programStatus;
     }
-    double **data = (double **) malloc(n_data * sizeof(double *));
+    data = (double **) malloc(n_data * sizeof(double *));
     if (!data) {
-        cerr << "Malloc error on data" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     for (int i = 0; i < n_data; ++i) {
         data[i] = &data_storage[i * n_dims];
@@ -214,13 +253,13 @@ int main(int argc, char **argv) {
     /*** Partitioning phase ***/
     peerLastItem = (long *) calloc(peers, sizeof(long));
     if (!peerLastItem) {
-        cerr << "Malloc error on peerLastItem" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     partitionSize = (long *) calloc(peers, sizeof(long));
     if (!partitionSize) {
-        cerr << "Malloc error on partitionSize" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     partitionData(n_data, peers, peerLastItem, partitionSize);
 
@@ -245,14 +284,13 @@ int main(int argc, char **argv) {
     }
 
     /*** Graph generation ***/
-    auto gengraphstart = chrono::steady_clock::now();
+    StartTheClock();
 
     graph = generateGraph(params.graphType, params.peers);
 
-    auto gengraphend = chrono::steady_clock::now();
+    elapsed = StopTheClock();
     if (!outputOnFile) {
-        cout << "Time (s) required to generate the random graph: " <<
-             chrono::duration_cast<chrono::nanoseconds>(gengraphend - gengraphstart).count()*1e-9 << endl;
+        cout <<"Time (seconds) required to generate the graph: " << elapsed<< "\n";
     }
 
     // determine minimum and maximum vertex degree for the graph
@@ -260,14 +298,10 @@ int main(int argc, char **argv) {
     result = getMinMaxVertexDeg(graph, outputOnFile);
     igraph_vector_destroy(&result);
 
-    // this is used to estimate the number of peers
-    double *dimestimate;
-
-    int Numberofconverged = params.peers;
-    bool *converged = (bool *) calloc(params.peers, sizeof(bool));
+    converged = (bool *) calloc(params.peers, sizeof(bool));
     if (!converged) {
-        cerr << "Malloc error on converged" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
 
     if (!outputOnFile) {
@@ -281,16 +315,16 @@ int main(int argc, char **argv) {
      * 2) An average consensus is executed on the average value for each dimension.
      * 3) Each peer centers its dataset partition on the average reached with consensus.
     ***/
-    auto std_start = chrono::steady_clock::now();
-    double *avg_storage = (double *) calloc(params.peers * n_dims, sizeof(double));
+    StartTheClock();
+    avg_storage = (double *) calloc(params.peers * n_dims, sizeof(double));
     if (!avg_storage) {
-        cerr << "Malloc error on avg_storage" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
-    double **avgsummaries = (double **) malloc(params.peers * sizeof(double *));
+    avgsummaries = (double **) malloc(params.peers * sizeof(double *));
     if (!avgsummaries) {
-        cerr << "Malloc error on avgsummaries" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++){
@@ -315,10 +349,9 @@ int main(int argc, char **argv) {
     free(avgsummaries);
     free(avg_storage);
 
-    auto std_end = chrono::steady_clock::now();
+    elapsed = StopTheClock();
     if (!outputOnFile) {
-        cout << "Time (s) required to standardize the dataset: " <<
-             chrono::duration_cast<chrono::nanoseconds>(std_end - std_start).count()*1e-9 << endl;
+        cout <<"Time (seconds) required to standardize the dataset: " << elapsed<< "\n";
     }
 
     if (!outputOnFile) {
@@ -336,32 +369,32 @@ int main(int argc, char **argv) {
      * 3) Each peer computes the Pearson matrix with the values resulting
      *      from consensus.
     ***/
-    auto pcc_start = chrono::steady_clock::now();
-    double *pcc_storage, **pcc_i, ***pcc, **squaresum_dims, *squaresum_dims_storage;
+    StartTheClock();
+
     pcc_storage = (double *) calloc(params.peers * n_dims * n_dims, sizeof(double));
     if (!pcc_storage) {
-        cerr << "Malloc error on pcc_storage" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     pcc_i = (double **) malloc(params.peers * n_dims * sizeof(double *));
     if (!pcc_i) {
-        cerr << "Malloc error on pcc_i" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     pcc = (double ***) malloc(params.peers * sizeof(double **));
     if (!pcc) {
-        cerr << "Malloc error on pcc" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     squaresum_dims_storage = (double *) calloc(params.peers * n_dims, sizeof(double));
     if (!squaresum_dims_storage) {
-        cerr << "Malloc error on squaresum_dims_storage" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     squaresum_dims = (double **) malloc(params.peers * sizeof(double *));
     if (!squaresum_dims) {
-        cerr << "Malloc error on squaresum_dims" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     for (int i = 0; i < params.peers * n_dims; ++i) {
         pcc_i[i] = &pcc_storage[i * n_dims];
@@ -379,10 +412,11 @@ int main(int argc, char **argv) {
     }
 
     VectorAverageConsensus(params, graph, n_dims, squaresum_dims);
-    int *num_dims = (int *) malloc(params.peers * sizeof(int));
+
+    num_dims = (int *) malloc(params.peers * sizeof(int));
     if (!num_dims) {
-        cerr << "Malloc error on num_dims" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     fill_n(num_dims, params.peers, n_dims);
     UDiagMatrixAverageConsensus(params, graph, num_dims, pcc);
@@ -394,10 +428,9 @@ int main(int argc, char **argv) {
     free(squaresum_dims);
     free(squaresum_dims_storage);
 
-    auto pcc_end = chrono::steady_clock::now();
+    elapsed = StopTheClock();
     if (!outputOnFile) {
-        cout << "Time (s) required to compute Pearson matrix: " <<
-             chrono::duration_cast<chrono::nanoseconds>(pcc_end - pcc_start).count()*1e-9 << endl;
+        cout <<"Time (seconds) required to compute the Pearson matrix: " << elapsed<< "\n";
     }
 
     if (!outputOnFile) {
@@ -412,27 +445,27 @@ int main(int argc, char **argv) {
      * dataset partition of a dimension and "uncorr" contains the indexes of
      * dimensions with Pearson coefficient less than 0.
     ***/
-    auto partition_start = chrono::steady_clock::now();
-    int *uncorr_vars, *corr_vars;
+    StartTheClock();
+
     corr_vars = (int *) calloc(params.peers, sizeof(int));
     if (!corr_vars) {
-        cerr << "Malloc error on corr_vars" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     uncorr_vars = (int *) calloc(params.peers, sizeof(int));
     if (!uncorr_vars) {
-        cerr << "Malloc error on uncorr_vars" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
-    int **uncorr = (int **) malloc(params.peers * sizeof(int *));
+    uncorr = (int **) malloc(params.peers * sizeof(int *));
     if (!uncorr) {
-        cerr << "Malloc error on corr or uncorr" << endl;
-        exit(-1);
-    };
-    double ***corr = (double ***) malloc(params.peers * sizeof(double **));
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
+    }
+    corr = (double ***) malloc(params.peers * sizeof(double **));
     if (!corr) {
-        cerr << "Malloc error on corr" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
@@ -452,34 +485,34 @@ int main(int argc, char **argv) {
 
         corr[peerID] = (double **) malloc(corr_vars[peerID] * sizeof(double *));
         if (!corr[peerID]) {
-            cerr << "Malloc error on corr for peer " << peerID << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
-        for (int k = 0; k < corr_vars[peerID]; ++k) {
-            corr[peerID][k] = (double *) malloc(partitionSize[peerID] * sizeof(double));
-            if (!corr[peerID][k]) {
-                cerr << "Malloc error on corr for peer " << peerID << endl;
-                exit(-1);
+        for (int corrVarID = 0; corrVarID < corr_vars[peerID]; ++corrVarID) {
+            corr[peerID][corrVarID] = (double *) malloc(partitionSize[peerID] * sizeof(double));
+            if (!corr[peerID][corrVarID]) {
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
         }
 
         uncorr[peerID] = (int *) malloc(uncorr_vars[peerID] * sizeof(int));
         if (!uncorr[peerID]) {
-            cerr << "Malloc error on uncorr" << endl;
-            exit(-1);
-        };
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
+        }
 
         corr_vars[peerID] = 0, uncorr_vars[peerID] = 0;
-        for (int i = 0; i < n_dims; ++i) {
-            if (isCorrDimension(n_dims, i, pcc[peerID])) {
+        for (int dimensionID = 0; dimensionID < n_dims; ++dimensionID) {
+            if (isCorrDimension(n_dims, dimensionID, pcc[peerID])) {
                 if (peerID == 0) {
-                    copyDimension(data, corr_vars[peerID], i, 0, peerLastItem[peerID], corr[peerID]);
+                    copyDimension(data, corr_vars[peerID], dimensionID, 0, peerLastItem[peerID], corr[peerID]);
                 } else {
-                    copyDimension(data, corr_vars[peerID], i, peerLastItem[peerID-1] + 1, peerLastItem[peerID], corr[peerID]);
+                    copyDimension(data, corr_vars[peerID], dimensionID, peerLastItem[peerID - 1] + 1, peerLastItem[peerID], corr[peerID]);
                 }
                 corr_vars[peerID]++;
             } else {
-                uncorr[peerID][uncorr_vars[peerID]] = i;
+                uncorr[peerID][uncorr_vars[peerID]] = dimensionID;
                 uncorr_vars[peerID]++;
             }
         }
@@ -488,10 +521,9 @@ int main(int argc, char **argv) {
     free(pcc_i);
     free(pcc_storage);
 
-    auto partition_end = chrono::steady_clock::now();
+    elapsed = StopTheClock();
     if (!outputOnFile) {
-        cout << "Time (s) required to partition the dataset in CORR and UNCORR sets: " <<
-             chrono::duration_cast<chrono::nanoseconds>(partition_end - partition_start).count() * 1e-9 << endl;
+        cout <<"Time (seconds) required to partition the dimensions in CORR and UNCORR: " << elapsed<< "\n";
     }
 
     if (!outputOnFile) {
@@ -506,22 +538,22 @@ int main(int argc, char **argv) {
      *      functions), get the 2 Principal Components and save them
      *      in "combine".
     ***/
-    auto pca_start = chrono::steady_clock::now();
-    double *covar_storage, **covar_i, ***covar;
+    StartTheClock();
+
     covar_storage = (double *) malloc(params.peers * corr_vars[0] * corr_vars[0] * sizeof(double));
     if (!covar_storage) {
-        cerr << "Malloc error on covar_storage" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     covar_i = (double **) malloc(params.peers * corr_vars[0] * sizeof(double *));
     if (!covar_i) {
-        cerr << "Malloc error on covar_i" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     covar = (double ***) malloc(params.peers * sizeof(double **));
     if (!covar) {
-        cerr << "Malloc error on covar" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     for (int i = 0; i < params.peers * corr_vars[0]; ++i) {
         covar_i[i] = &covar_storage[i * corr_vars[0]];
@@ -536,24 +568,23 @@ int main(int argc, char **argv) {
 
     UDiagMatrixAverageConsensus(params, graph, corr_vars, covar);
 
-    double ***combine;
     combine = (double ***) malloc(params.peers * sizeof(double **));
     if (!combine) {
-        cerr << "Malloc error on combine" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
         combine[peerID] = (double **) malloc(3 * sizeof(double *));
         if (!combine[peerID]) {
-            cerr << "Malloc error on combine for peer " << peerID << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
-        for (int k = 0; k < 3; ++k) {
-            combine[peerID][k] = (double *) malloc(partitionSize[peerID] * sizeof(double));
-            if (!combine[peerID][k]) {
-                cerr << "Malloc error on combine for peer " << peerID << endl;
-                exit(-1);
+        for (int i = 0; i < 3; ++i) {
+            combine[peerID][i] = (double *) malloc(partitionSize[peerID] * sizeof(double));
+            if (!combine[peerID][i]) {
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
         }
 
@@ -565,10 +596,9 @@ int main(int argc, char **argv) {
     free(covar_i);
     free(covar);
 
-    auto pca_end = chrono::steady_clock::now();
+    elapsed = StopTheClock();
     if (!outputOnFile) {
-        cout << "Time (s) required to compute Principal Component Analysis on CORR set: " <<
-             chrono::duration_cast<chrono::nanoseconds>(pca_end - pca_start).count()*1e-9 << endl;
+        cout <<"Time (seconds) required to apply PCA on CORR set: " << elapsed<< "\n";
     }
 
     if (!outputOnFile) {
@@ -585,31 +615,31 @@ int main(int argc, char **argv) {
      *      save them in "subspace".
      * These operations are done for each dimension in UNCORR set.
     ***/
-    auto cs_start = chrono::steady_clock::now();
-    double ****subspace;
+    StartTheClock();
+
     subspace = (double ****) malloc(params.peers * sizeof(double ***));
     if (!subspace) {
-        cerr << "Malloc error on subspace" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
         subspace[peerID] = (double ***) malloc(uncorr_vars[peerID] * sizeof(double **));
         if (!subspace[peerID]) {
-            cerr << "Malloc error on subspace for peer " << peerID << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
-        for (int m = 0; m < uncorr_vars[peerID]; ++m) {
-            subspace[peerID][m] = (double **) malloc(2 * sizeof(double *));
-            if (!subspace[peerID][m]) {
-                cerr << "Malloc error on subspace for peer " << peerID << endl;
-                exit(-1);
+        for (int uncorrVarID = 0; uncorrVarID < uncorr_vars[peerID]; ++uncorrVarID) {
+            subspace[peerID][uncorrVarID] = (double **) malloc(2 * sizeof(double *));
+            if (!subspace[peerID][uncorrVarID]) {
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
-            for (int k = 0; k < 2; ++k) {
-                subspace[peerID][m][k] = (double *) malloc(partitionSize[peerID] * sizeof(double));
-                if (!subspace[peerID][m][k]) {
-                    cerr << "Malloc error on subspace for peer " << peerID << endl;
-                    exit(-1);
+            for (int dimID = 0; dimID < 2; ++dimID) {
+                subspace[peerID][uncorrVarID][dimID] = (double *) malloc(partitionSize[peerID] * sizeof(double));
+                if (!subspace[peerID][uncorrVarID][dimID]) {
+                    programStatus = memoryError(__FUNCTION__);
+                    goto ON_EXIT;
                 }
             }
         }
@@ -618,27 +648,27 @@ int main(int argc, char **argv) {
     for (int subspaceID = 0; subspaceID < uncorr_vars[0]; ++subspaceID) {
         covar_storage = (double *) malloc(params.peers * 3 * 3 * sizeof(double));
         if (!covar_storage) {
-            cerr << "Malloc error on covar_storage" << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
         covar_i = (double **) malloc(params.peers * 3 * sizeof(double *));
         if (!covar_i) {
-            cerr << "Malloc error on covar_i" << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
         covar = (double ***) malloc(params.peers * sizeof(double **));
         if (!covar) {
-            cerr << "Malloc error on covar" << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
-        for (int j = 0; j < params.peers * 3; ++j) {
-            covar_i[j] = &covar_storage[j * 3];
+        for (int i = 0; i < params.peers * 3; ++i) {
+            covar_i[i] = &covar_storage[i * 3];
         }
 
         for(int peerID = 0; peerID < params.peers; peerID++) {
             covar[peerID] = &covar_i[peerID * 3];
 
-            for (int j = 0; j < partitionSize[peerID]; ++j) {
+            for (int i = 0; i < partitionSize[peerID]; ++i) {
                 if (peerID == 0) {
                     copyDimension(data, 2, uncorr[peerID][subspaceID], 0, peerLastItem[peerID], combine[peerID]);
                 } else {
@@ -648,10 +678,10 @@ int main(int argc, char **argv) {
             computeLocalCovarianceMatrix(partitionSize[peerID], 3, combine[peerID], covar[peerID]);
         }
 
-        int *cs_dims = (int *) malloc(params.peers * sizeof(int));
+        cs_dims = (int *) malloc(params.peers * sizeof(int));
         if (!cs_dims) {
-            cerr << "Malloc error on cs_dims" << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
         fill_n(cs_dims, params.peers, 3);
         UDiagMatrixAverageConsensus(params, graph, cs_dims, covar);
@@ -667,10 +697,9 @@ int main(int argc, char **argv) {
     free(uncorr);
     free(combine);
 
-    auto cs_end = chrono::steady_clock::now();
+    elapsed = StopTheClock();
     if (!outputOnFile) {
-        cout << "Time (s) required to create candidate subspaces: " <<
-             chrono::duration_cast<chrono::nanoseconds>(cs_end - cs_start).count()*1e-9 << endl;
+        cout <<"Time (seconds) required to create the candidate subspaces: " << elapsed<< "\n";
     }
 
     if (!outputOnFile) {
@@ -696,29 +725,25 @@ int main(int argc, char **argv) {
      *      If the condition about the elbow is satisfied, the distributed clustering
      *      for the actual candidate subspace is stopped.
     ***/
-    auto clustering_start = chrono::steady_clock::now();
+    StartTheClock();
 
-    cluster_report *final_i = (cluster_report *) calloc(uncorr_vars[0] * params.peers, sizeof(cluster_report));
+    final_i = (cluster_report *) calloc(uncorr_vars[0] * params.peers, sizeof(cluster_report));
     if (!final_i) {
-        cerr << "Malloc error on final_i" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
-    cluster_report **final = (cluster_report **) calloc(uncorr_vars[0], sizeof(cluster_report*));
+    final = (cluster_report **) calloc(uncorr_vars[0], sizeof(cluster_report*));
     if (!final) {
-        cerr << "Malloc error on final" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
-
-    double *localsum_storage, **localsum_i, ***localsum, *weights_storage, **weights, *prev_err, *error;
-    // Structures used for distributed BetaCV computation
-    double *pts_incluster_storage, **pts_incluster, *c_mean_storage, **c_mean;
 
     for (int subspaceID = 0; subspaceID < uncorr_vars[0]; ++subspaceID) {
         final[subspaceID] = &final_i[subspaceID * params.peers];
-        cluster_report *prev = (cluster_report *) calloc(params.peers, sizeof(cluster_report));
+        prev = (cluster_report *) calloc(params.peers, sizeof(cluster_report));
         if (!prev) {
-            cerr << "Malloc error on prev" << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
 
         for (int nCluster = 1; nCluster <= params.k_max; ++nCluster) {
@@ -734,46 +759,46 @@ int main(int argc, char **argv) {
 
             localsum_storage = (double *) malloc(nCluster * 2 * params.peers * sizeof(double));
             if (!localsum_storage) {
-                cerr << "Malloc error on localsum_storage" << endl;
-                exit(-1);
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
             localsum_i = (double **) malloc(2 * params.peers * sizeof(double *));
             if (!localsum_i) {
-                cerr << "Malloc error on localsum_i" << endl;
-                exit(-1);
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
             localsum = (double ***) malloc(params.peers * sizeof(double **));
             if (!localsum) {
-                cerr << "Malloc error on localsum" << endl;
-                exit(-1);
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
             weights_storage = (double *) malloc(params.peers * nCluster * sizeof(double));
             if (!weights_storage) {
-                cerr << "Malloc error on weights_storage" << endl;
-                exit(-1);
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
             weights = (double **) malloc(params.peers * sizeof(double *));
             if (!weights) {
-                cerr << "Malloc error on weights" << endl;
-                exit(-1);
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
-            for (int i1 = 0; i1 < 2 * params.peers; ++i1) {
-                localsum_i[i1] = &localsum_storage[i1 * nCluster];
+            for (int i = 0; i < 2 * params.peers; ++i) {
+                localsum_i[i] = &localsum_storage[i * nCluster];
             }
-            for (int i1 = 0; i1 < params.peers; ++i1) {
-                localsum[i1] = &localsum_i[i1 * 2];
-                weights[i1] = &weights_storage[i1 * nCluster];
+            for (int i = 0; i < params.peers; ++i) {
+                localsum[i] = &localsum_i[i * 2];
+                weights[i] = &weights_storage[i * nCluster];
             }
 
             prev_err = (double *) malloc(params.peers * sizeof(double));
             if (!prev_err) {
-                cerr << "Malloc error on prev_err" << endl;
-                exit(-1);
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
             error = (double *) malloc(params.peers * sizeof(double));
             if (!error) {
-                cerr << "Malloc error on error" << endl;
-                exit(-1);
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
             fill_n(error, params.peers, 1e9);
 
@@ -799,9 +824,9 @@ int main(int argc, char **argv) {
                 dimestimate = SimpleAverageConsensus(params, graph, error);
 
                 for(int peerID = 0; peerID < params.peers; peerID++){
-                    for (int l = 0; l < nCluster; ++l) {
-                        centroids(0, l, peerID) = localsum[peerID][0][l] / weights[peerID][l];
-                        centroids(1, l, peerID) = localsum[peerID][1][l] / weights[peerID][l];
+                    for (int clusterID = 0; clusterID < nCluster; ++clusterID) {
+                        centroids(0, clusterID, peerID) = localsum[peerID][0][clusterID] / weights[peerID][clusterID];
+                        centroids(1, clusterID, peerID) = localsum[peerID][1][clusterID] / weights[peerID][clusterID];
                     }
                     error[peerID] = error[peerID] / dimestimate[peerID];
                 }
@@ -834,13 +859,8 @@ int main(int argc, char **argv) {
                     final[subspaceID][peerID].BetaCV = 0.0;
                     final[subspaceID][peerID].cidx = (int *) calloc(partitionSize[peerID], sizeof(int));
                     if (!final[subspaceID][peerID].cidx) {
-                        cerr << "Malloc error on final cidx for peer " << peerID << endl;
-                        exit(-1);
-                    }
-                    prev[peerID].cidx = (int *) malloc(partitionSize[peerID] * sizeof(int));
-                    if (!prev[peerID].cidx) {
-                        cerr << "Malloc error on previous cidx for peer " << peerID << endl;
-                        exit(-1);
+                        programStatus = memoryError(__FUNCTION__);
+                        goto ON_EXIT;
                     }
                 } else {
                     final[subspaceID][peerID].centroids = centroids.slice(peerID);
@@ -865,23 +885,23 @@ int main(int argc, char **argv) {
             if (nCluster > 1) {
                 pts_incluster_storage = (double *) calloc(params.peers * nCluster, sizeof(double));
                 if (!pts_incluster_storage) {
-                    cerr << "Malloc error on pts_incluster_storage" << endl;
-                    exit(-1);
+                    programStatus = memoryError(__FUNCTION__);
+                    goto ON_EXIT;
                 }
                 pts_incluster = (double **) malloc(params.peers * sizeof(double *));
                 if (!pts_incluster) {
-                    cerr << "Malloc error on pts_incluster" << endl;
-                    exit(-1);
+                    programStatus = memoryError(__FUNCTION__);
+                    goto ON_EXIT;
                 }
                 c_mean_storage = (double *) calloc(params.peers * 2, sizeof(double));
                 if (!c_mean_storage) {
-                    cerr << "Malloc error on c_mean_storage" << endl;
-                    exit(-1);
+                    programStatus = memoryError(__FUNCTION__);
+                    goto ON_EXIT;
                 }
                 c_mean = (double **) malloc(params.peers * sizeof(double *));
                 if (!c_mean) {
-                    cerr << "Malloc error on c_mean" << endl;
-                    exit(-1);
+                    programStatus = memoryError(__FUNCTION__);
+                    goto ON_EXIT;
                 }
                 for (int peerID = 0; peerID < params.peers; peerID++) {
                     pts_incluster[peerID] = &pts_incluster_storage[peerID * nCluster];
@@ -895,30 +915,30 @@ int main(int argc, char **argv) {
                 dimestimate = VectorAverageConsensus(params, graph, nCluster, pts_incluster);
 
                 for (int peerID = 0; peerID < params.peers; peerID++) {
-                    for (int m = 0; m < nCluster; ++m) {
-                        pts_incluster[peerID][m] = pts_incluster[peerID][m] / dimestimate[peerID];
+                    for (int clusterID = 0; clusterID < nCluster; ++clusterID) {
+                        pts_incluster[peerID][clusterID] = pts_incluster[peerID][clusterID] / dimestimate[peerID];
                     }
                 }
 
-                double *bcss_storage = (double *) calloc(params.peers, sizeof(double));
+                bcss_storage = (double *) calloc(params.peers, sizeof(double));
                 if (!bcss_storage) {
-                    cerr << "Malloc error on bcss_storage" << endl;
-                    exit(-1);
+                    programStatus = memoryError(__FUNCTION__);
+                    goto ON_EXIT;
                 }
-                double *wcss_storage = (double *) calloc(params.peers, sizeof(double));
+                wcss_storage = (double *) calloc(params.peers, sizeof(double));
                 if (!wcss_storage) {
-                    cerr << "Malloc error on wcss_storage" << endl;
-                    exit(-1);
+                    programStatus = memoryError(__FUNCTION__);
+                    goto ON_EXIT;
                 }
-                double *nin_storage = (double *) calloc(params.peers, sizeof(double));
+                nin_storage = (double *) calloc(params.peers, sizeof(double));
                 if (!nin_storage) {
-                    cerr << "Malloc error on nin_storage" << endl;
-                    exit(-1);
+                    programStatus = memoryError(__FUNCTION__);
+                    goto ON_EXIT;
                 }
-                double *nout_storage = (double *) calloc(params.peers, sizeof(double));
+                nout_storage = (double *) calloc(params.peers, sizeof(double));
                 if (!nout_storage) {
-                    cerr << "Malloc error on nout_storage" << endl;
-                    exit(-1);
+                    programStatus = memoryError(__FUNCTION__);
+                    goto ON_EXIT;
                 }
                 for (int peerID = 0; peerID < params.peers; peerID++) {
                     computeNin_Nout(nCluster, pts_incluster[peerID], nin_storage[peerID], nout_storage[peerID]);
@@ -954,10 +974,9 @@ int main(int argc, char **argv) {
         free(prev);
     }
 
-    auto clustering_end = chrono::steady_clock::now();
+    elapsed = StopTheClock();
     if (!outputOnFile) {
-        cout << "Time (s) required to run K-Means: " <<
-             chrono::duration_cast<chrono::nanoseconds>(clustering_end - clustering_start).count()*1e-9 << endl;
+        cout <<"Time (seconds) required to run K-Means: " << elapsed<< "\n";
     }
 
     /***    Outliers Identification On Each Candidate Subspace
@@ -980,51 +999,48 @@ int main(int argc, char **argv) {
      *      of "inliers" and if one of the conditions on the inliers is satisfied,
      *      the outlier identification for the actual cluster is stopped.
     ***/
-    auto identification_start = chrono::steady_clock::now();
+    StartTheClock();
     // Structure to keep record of inliers for each peer (for Outlier identification)
-    bool ***discardedPts;
     discardedPts = (bool ***) malloc(params.peers * sizeof(bool **));
     if (!discardedPts) {
-        cerr << "Malloc error on discardedPts" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     for(int peerID = 0; peerID < params.peers; peerID++) {
         discardedPts[peerID] = (bool **) malloc(uncorr_vars[peerID] * sizeof(bool *));
         if (!discardedPts[peerID]) {
-            cerr << "Malloc error on discardedPts for peer " << peerID << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
-        for (int m = 0; m < uncorr_vars[peerID]; ++m) {
-            discardedPts[peerID][m] = (bool *) calloc(partitionSize[peerID], sizeof(bool));
-            if (!discardedPts[peerID][m]) {
-                cerr << "Malloc error on discardedPts for peer " << peerID << endl;
-                exit(-1);
+        for (int uncorrVarID = 0; uncorrVarID < uncorr_vars[peerID]; ++uncorrVarID) {
+            discardedPts[peerID][uncorrVarID] = (bool *) calloc(partitionSize[peerID], sizeof(bool));
+            if (!discardedPts[peerID][uncorrVarID]) {
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
         }
     }
 
-    double *inliers, *prev_inliers, *cluster_dim, *actual_dist, *actual_cluster_dim;
-
-    for (int i = 0; i < uncorr_vars[0]; ++i) {
+    for (int subspaceID = 0; subspaceID < uncorr_vars[0]; ++subspaceID) {
         inliers = (double *) malloc(params.peers * sizeof(double));
         if (!inliers) {
-            cerr << "Malloc error on inliers" << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
         prev_inliers = (double *) malloc(params.peers * sizeof(double));
         if (!prev_inliers) {
-            cerr << "Malloc error on prev_inliers" << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
         cluster_dim = (double *) malloc(params.peers * sizeof(double));
         if (!cluster_dim) {
-            cerr << "Malloc error on cluster_dim" << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
 
-        for (int l = 0; l < final[i][0].k; ++l) {
+        for (int clusterId = 0; clusterId < final[subspaceID][0].k; ++clusterId) {
             for (int peerID = 0; peerID < params.peers; peerID++) {
-                cluster_dim[peerID] = cluster_size(final[i][peerID], l, partitionSize[peerID]);
+                cluster_dim[peerID] = cluster_size(final[subspaceID][peerID], clusterId, partitionSize[peerID]);
             }
 
             SimpleAverageConsensus(params, graph, cluster_dim);
@@ -1035,13 +1051,13 @@ int main(int argc, char **argv) {
             fill_n(converged, params.peers, false);
             actual_dist = (double *) calloc(params.peers, sizeof(double));
             if (!actual_dist) {
-                cerr << "Malloc error on actual_dist" << endl;
-                exit(-1);
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
             actual_cluster_dim = (double *) calloc(params.peers, sizeof(double));
             if (!actual_cluster_dim) {
-                cerr << "Malloc error on actual_cluster_dim" << endl;
-                exit(-1);
+                programStatus = memoryError(__FUNCTION__);
+                goto ON_EXIT;
             }
 
             while (Numberofconverged) {
@@ -1052,10 +1068,10 @@ int main(int argc, char **argv) {
                     if (converged[peerID])
                         continue;
 
-                    actual_cluster_dim[peerID] = computeLocalClusterDimension(partitionSize[peerID], final[i][peerID],
-                                                                              l, discardedPts[peerID][i]);
-                    actual_dist[peerID] = computeLocalClusterDistance(partitionSize[peerID], final[i][peerID], l,
-                                                                      discardedPts[peerID][i], subspace[peerID][i]);
+                    actual_cluster_dim[peerID] = computeLocalClusterDimension(partitionSize[peerID], final[subspaceID][peerID],
+                                                                              clusterId, discardedPts[peerID][subspaceID]);
+                    actual_dist[peerID] = computeLocalClusterDistance(partitionSize[peerID], final[subspaceID][peerID], clusterId,
+                                                                      discardedPts[peerID][subspaceID], subspace[peerID][subspaceID]);
                 }
 
                 SimpleAverageConsensus(params, graph, actual_dist);
@@ -1063,12 +1079,12 @@ int main(int argc, char **argv) {
 
                 for (int peerID = 0; peerID < params.peers; peerID++) {
                     double dist_mean = actual_dist[peerID] / actual_cluster_dim[peerID];
-                    inliers[peerID] += computeLocalInliers(partitionSize[peerID], final[i][peerID], l,
-                                                           discardedPts[peerID][i], subspace[peerID][i],
+                    inliers[peerID] += computeLocalInliers(partitionSize[peerID], final[subspaceID][peerID], clusterId,
+                                                           discardedPts[peerID][subspaceID], subspace[peerID][subspaceID],
                                                            dist_mean);
                 }
 
-                dimestimate = SimpleAverageConsensus(params, graph, inliers);
+                SimpleAverageConsensus(params, graph, inliers);
 
                 // check local convergence
                 for (int peerID = 0; peerID < params.peers; peerID++) {
@@ -1099,10 +1115,10 @@ int main(int argc, char **argv) {
      * of each element in "global_outliers".
      * Finally peer 0 is queried to get the final result.
     ***/
-    double *tot_num_data = (double *) calloc(params.peers, sizeof(double));
+    tot_num_data = (double *) calloc(params.peers, sizeof(double));
     if (!tot_num_data) {
-        cerr << "Malloc error on tot_num_data" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
     for(int peerID = 0; peerID < params.peers; peerID++){
         tot_num_data[peerID] = partitionSize[peerID];
@@ -1110,10 +1126,10 @@ int main(int argc, char **argv) {
 
     dimestimate = SimpleAverageConsensus(params, graph, tot_num_data);
 
-    double **global_outliers = (double **) malloc(params.peers * sizeof(double *));
+    global_outliers = (double **) malloc(params.peers * sizeof(double *));
     if (!global_outliers) {
-        cerr << "Malloc error on global_outliers" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
 
     for (int peerID = 0; peerID < params.peers; peerID++) {
@@ -1121,8 +1137,8 @@ int main(int argc, char **argv) {
 
         global_outliers[peerID] = (double *) calloc(tot_num_data[peerID], sizeof(double));
         if (!global_outliers[peerID]) {
-            cerr << "Malloc error on global_outliers for peer" << peerID << endl;
-            exit(-1);
+            programStatus = memoryError(__FUNCTION__);
+            goto ON_EXIT;
         }
 
         if (peerID == 0) {
@@ -1139,17 +1155,16 @@ int main(int argc, char **argv) {
     Numberofconverged = params.peers;
     fill_n(converged, params.peers, false);
 
-    double *prevestimate = (double *) calloc(params.peers, sizeof(double));
+    prevestimate = (double *) calloc(params.peers, sizeof(double));
     if (!prevestimate) {
-        cerr << "Malloc error on prevestimate" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
-    int *convRounds = (int *) calloc(params.peers, sizeof(int));
+    convRounds = (int *) calloc(params.peers, sizeof(int));
     if (!convRounds) {
-        cerr << "Malloc error on convRounds" << endl;
-        exit(-1);
+        programStatus = memoryError(__FUNCTION__);
+        goto ON_EXIT;
     }
-    int rounds = 0;
 
     while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
         memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
@@ -1174,8 +1189,8 @@ int main(int argc, char **argv) {
                 igraph_integer_t edgeID;
                 igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
 
-                for (int q = 0; q < tot_num_data[peerID]; ++q) {
-                    computeAverage(&global_outliers[peerID][q], global_outliers[neighborID][q]);
+                for (int dataID = 0; dataID < tot_num_data[peerID]; ++dataID) {
+                    computeAverage(&global_outliers[peerID][dataID], global_outliers[neighborID][dataID]);
                 }
                 memcpy(global_outliers[neighborID], global_outliers[peerID], tot_num_data[peerID] * sizeof(double));
                 computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
@@ -1212,19 +1227,19 @@ int main(int argc, char **argv) {
     }
 
     for (int peerID = 0; peerID < params.peers; peerID++) {
-        for (int i = 0; i < tot_num_data[peerID]; ++i) {
-            global_outliers[peerID][i] = std::round(global_outliers[peerID][i] / dimestimate[peerID]);
+        for (int dataID = 0; dataID < tot_num_data[peerID]; ++dataID) {
+            global_outliers[peerID][dataID] = std::round(global_outliers[peerID][dataID] / dimestimate[peerID]);
         }
     }
 
     cout << endl << "OUTLIERS:" << endl;
-    for (int i = 0; i < tot_num_data[0]; ++i) {
-        if (global_outliers[0][i] >= std::round(uncorr_vars[0] * params.percentageSubspaces)) {
-            cout << i << ") ";
+    for (int dataID = 0; dataID < tot_num_data[0]; ++dataID) {
+        if (global_outliers[0][dataID] >= std::round(uncorr_vars[0] * params.percentageSubspaces)) {
+            cout << dataID << ") ";
             for (int l = 0; l < n_dims; ++l) {
-                cout << data[i][l] << " ";
+                cout << data[dataID][l] << " ";
             }
-            cout << "(" << global_outliers[0][i] << ")" << endl;
+            cout << "(" << global_outliers[0][dataID] << ")" << endl;
         }
     }
     //data_out(subspace, peerLastItem, "iris.csv", discardedPts, params.peers, uncorr_vars[0], final[0]);
@@ -1236,10 +1251,9 @@ int main(int argc, char **argv) {
     free(final);
     free(final_i);
 
-    auto identification_end = chrono::steady_clock::now();
+    elapsed = StopTheClock();
     if (!outputOnFile) {
-        cout << "Time (s) required to identify outliers: " <<
-             chrono::duration_cast<chrono::nanoseconds>(identification_end - identification_start).count()*1e-9 << endl;
+        cout <<"Time (seconds) required to identify the outliers: " << elapsed<< "\n";
     }
 
     igraph_destroy(&graph);
@@ -1251,7 +1265,19 @@ int main(int argc, char **argv) {
     free(converged);
     free(convRounds);
 
-    return 0;
+    ON_EXIT:
+
+    return programStatus;
+}
+
+void StartTheClock(){
+    t1 = chrono::high_resolution_clock::now();
+}
+
+double StopTheClock() {
+    t2 = chrono::high_resolution_clock::now();
+    chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+    return time_span.count();
 }
 
 void usage(char* cmd)
@@ -1398,7 +1424,7 @@ bool isCorrDimension(int ndims, int firstDimension, double **pcc) {
 }
 
 int computeCorrUncorrCardinality(double **pcc, int ndims, int &corr_vars, int &uncorr_vars) {
-    if (!pcc || !(&corr_vars) || !(&uncorr_vars)) {
+    if (!pcc) {
         return NullPointerError(__FUNCTION__);
     }
 
@@ -1464,7 +1490,7 @@ int computePCA(double **covarianceMatrix, double **oldSpace, long partitionSize,
 }
 
 int computeLocalKMeans(long partitionSize, mat centroids, double **subspace, double *weights, double **localsum, double &error) {
-    if (!subspace || !weights || !localsum || !(&error) || centroids.is_empty()) {
+    if (!subspace || !weights || !localsum || centroids.is_empty()) {
         return NullPointerError(__FUNCTION__);
     }
 
@@ -1513,7 +1539,7 @@ int computeLocalPtsIncluster(long partitionSize, double *pts_incluster, cluster_
 }
 
 int computeNin_Nout(int nCluster, double *pts_incluster, double &Nin, double &Nout) {
-    if (!pts_incluster || !(&Nin) || !(&Nout)) {
+    if (!pts_incluster) {
         return NullPointerError(__FUNCTION__);
     }
 

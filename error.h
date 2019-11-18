@@ -2,6 +2,10 @@
 #define DISTRIBUTEDADAPTIVECLUSTERING_ERROR_H
 #include <iostream>
 
+/**
+ * @file error.h
+ */
+
 using namespace std;
 
 int fileError(string nameFunction);

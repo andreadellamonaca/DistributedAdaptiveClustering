@@ -136,16 +136,16 @@ void printGraphType(int type)
 {
     switch (type) {
         case 1:
-            printf("Geometric random graph\n");
+            cout << "Geometric random graph" << endl;
             break;
         case 2:
-            printf("Barabasi-Albert random graph\n");
+            cout << "Barabasi-Albert random graph" << endl;
             break;
         case 3:
-            printf("Erdos-Renyi random graph\n");
+            cout << "Erdos-Renyi random graph" << endl;
             break;
         case 4:
-            printf("Regular random graph\n");
+            cout << "Regular random graph" << endl;
             break;
         default:
             break;
