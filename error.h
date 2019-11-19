@@ -17,5 +17,6 @@ int DatasetReadingError(string nameFunction);
 int PartitioningDatasetError(string nameFunction);
 int ConversionError(string nameFunction);
 int InputFileError(string nameFunction);
+int MergeError(string nameFunction);
 
 #endif //DISTRIBUTEDADAPTIVECLUSTERING_ERROR_H

@@ -89,3 +89,13 @@ int InputFileError(string nameFunction) {
     cerr << nameFunction << ": Could not read Input File!" << endl;
     return -9;
 }
+
+/**
+ *
+ * @param [in] nameFunction - Name of the calling function
+ * @return -10
+ */
+int MergeError(string nameFunction) {
+    cerr << nameFunction << ": MergeError" << endl;
+    return -10;
+}

@@ -164,32 +164,200 @@ int computeLocalCovarianceMatrix(long partitionSize, int covarMatrixDim, double 
 /**
  * This function computes the Principal Component Analysis for a single peer taking the
  * 2 principal components (with Armadillo library functions).
- * @param covarianceMatrix a matrix [n_dims,n_dims] containing the covariance matrix.
- * @param oldSpace a matrix [n_dims,partitionSize] containing the space on which the
+ * @param [in] covarianceMatrix a matrix [n_dims,n_dims] containing the covariance matrix.
+ * @param [in] oldSpace a matrix [n_dims,partitionSize] containing the space on which the
  *                  covarianceMatrix was computed.
- * @param partitionSize the number of elements managed by the peer.
- * @param n_dims the number of dimensions.
- * @param newSpace a matrix [2, partitionSize] to store the resulting space.
+ * @param [in] partitionSize the number of elements managed by the peer.
+ * @param [in] n_dims the number of dimensions.
+ * @param [in,out] newSpace a matrix [2, partitionSize] to store the resulting space.
  * @return 0 if it is correct, -2 if covarianceMatrix, oldSpace or newSpace are NULL.
  */
 int computePCA(double **covarianceMatrix, double **oldSpace, long partitionSize, int n_dims, double **newSpace);
 int computeLocalKMeans(long partitionSize, mat centroids, double **subspace, double *weights, double **localsum, double &error);
+/**
+ * This function computes the mean on each of the 2 dimensions in data for a single peer.
+ * @param [in] data a matrix [2, partitionSize] containing the data partition of a peer.
+ * @param [in] partitionSize the number of elements managed by the peer.
+ * @param [in, out] summaries an array [1, 2] to store the mean.
+ * @return 0 if it is correct, -2 if data or summaries are NULL.
+ */
 int computeLocalC_Mean(double **data, long partitionSize, double *summaries);
+/**
+ * This function computes the number of elements in each cluster for a single peer.
+ * @param [in] partitionSize the number of elements managed by the peer.
+ * @param [in, out] pts_incluster an array [1, ncluster] to store the computed values.
+ * @param [in] rep a cluster_report structure containing the clustering informations.
+ * @return 0 if it is correct, -2 if pts_incluster or rep.cidx are NULL.
+ */
 int computeLocalPtsIncluster(long partitionSize, double *pts_incluster, cluster_report rep);
+/**
+ * This function computes the number of inter-cluster (Nout) and
+ * intra-cluster(Nin) pairs.
+ * @param [in] nCluster the number of clusters.
+ * @param [in] pts_incluster an array [1, ncluster] containing the number of elements
+ *                              in each cluster.
+ * @param [in,out] Nin a double value to store the number of intra-cluster pairs.
+ * @param [in,out] Nout a double value to store the number of inter-cluster pairs.
+ * @return 0 if it is correct, -2 if pts_incluster is NULL.
+ */
 int computeNin_Nout(int nCluster, double *pts_incluster, double &Nin, double &Nout);
+/**
+ * This function computes the overall intra-cluster distance.
+ * The program exits with code -2 if pts_incluster or c_mean are NULL or
+ * centroids is empty.
+ * @param [in] pts_incluster an array [1, ncluster] containing the number of elements
+ *                              in each cluster.
+ * @param [in] centroids a mat structure (from Armadillo).
+ * @param [in] c_mean an array containing the mean for each of the 2 dimensions.
+ * @return a double value indicating the intra-cluster distance.
+ */
 double computeBCSS(double *pts_incluster, mat centroids, double *c_mean);
+/**
+ * This function computes the inter-cluster distance for a single peer.
+ * The program exits with code -2 if rep.cidx or subspace are NULL or
+ * rep.centroids is empty.
+ * @param [in] partitionSize the number of elements managed by the peer.
+ * @param [in] rep a cluster_report structure containing the clustering informations.
+ * @param [in] subspace a matrix [2, partitionSize] containing the data on which
+ *                  clustering was executed.
+ * @return a double value indicating the inter-cluster distance.
+ */
 double computeLocalWCSS(long partitionSize, cluster_report rep, double **subspace);
+/**
+ * This function computes the distance between each point (not discarded previously)
+ * managed by a single peer and its centroids.
+ * The program exits with code -2 if discarded, subspace or rep.cidx are NULL or
+ * rep.centroids is empty.
+ * @param [in] partitionSize the number of elements managed by the peer.
+ * @param [in] rep a cluster_report structure containing the clustering informations.
+ * @param [in] clusterid the index indicating the considered cluster.
+ * @param [in] discarded an array [1, partitionSize] indicating if a point was
+ *                          discarded in a previous iteration.
+ * @param [in] subspace a matrix [2, partitionSize] containing the data on which
+ *                  clustering was executed.
+ * @return a double value indicating the overall distance.
+ */
 double computeLocalClusterDistance(long partitionSize, cluster_report rep, int clusterid, bool *discarded, double **subspace);
+/**
+ * This function computes the number of elements (not discarded previously) managed by
+ * a single peer in the given cluster. The program exits with code -2 if discarded or
+ * rep.cidx are NULL.
+ * @param [in] partitionSize the number of elements managed by the peer.
+ * @param [in] rep a cluster_report structure containing the clustering informations.
+ * @param [in] clusterid the index indicating the considered cluster.
+ * @param [in] discarded an array [1, partitionSize] indicating if a point was
+ *                          discarded in a previous iteration.
+ * @return the count of elements (not discarded previously) in the cluster.
+ */
 int computeLocalClusterDimension(long partitionSize, cluster_report rep, int clusterid, bool *discarded);
+/**
+ * This function computes the points managed by a single peer which are in the circle
+ * and it updates "discarded". The program exits with code -2 if discarded, subspace or
+ * rep.cidx are NULL or rep.centroids is empty.
+ * @param [in] partitionSize the number of elements managed by the peer.
+ * @param [in] rep a cluster_report structure containing the clustering informations.
+ * @param [in] clusterid the index indicating the considered cluster.
+ * @param [in,out] discarded an array [1, partitionSize] indicating if a point was
+ *                          discarded in a previous iteration.
+ * @param [in] subspace a matrix [2, partitionSize] containing the data on which
+ *                      clustering was executed.
+ * @param [in] radius the radius of the circle to be used.
+ * @return the count of inliers found in this iteration.
+ */
 int computeLocalInliers(long partitionSize, cluster_report rep, int clusterid, bool *discarded, double **subspace, double radius);
+/**
+ * This function computes the number of times each point managed by the peer
+ * is considered as outliers in all the subspaces.
+ * @param [in] uncorr_vars the number of dimensions in UNCORR.
+ * @param [in] partitionSize the number of elements managed by the peer.
+ * @param [in] start_idx the index, a value between 0 and n_data, of the first
+ *                          element of the peer.
+ * @param [in] discarded a matrix [uncorr_vars, partitionSize] indicating if a
+ *                        point was discarded.
+ * @param [in,out] outliers an array [1,n_data] to store the number of times
+ *                          each point is an outlier in all the subspaces.
+ * @return 0 if it is correct, -2 if discarded or outliers are NULL.
+ */
 int getCountOutliersinSubspace(int uncorr_vars, long partitionSize, int start_idx, bool **discarded, double *outliers);
+/**
+ * This function computes the average between 2 values and theresult is stored
+ * in the first argument.
+ * @param [in,out] x the address of the first value to be averaged.
+ * @param [in] y the second value to be averaged.
+ * @return 0 if it is correct, -2 if x is NULL.
+ */
 int computeAverage(double *x, double y);
-int mergeSimpleMessages(int dim, double *peerElem, double *neighborElem);
-int mergeUDiagMatrix(int n_dims, double **UDiagMatrix_X, double **UDiagMatrix_Y);
-double* SimpleAverageConsensus(Params params, igraph_t graph, double* structure);
+/**
+ * This function merge 2 arrays with point-wise average.
+ * @param [in] dim the dimension of the array.
+ * @param [in,out] peerVector the first array to be merged.
+ * @param [in,out] neighborVector the second array to be merged.
+ * @return 0 if it is correct, -2 if peerVector or neighborVector are NULL.
+ */
+int mergeVector(int dim, double *peerVector, double *neighborVector);
+/**
+ * This function merge the upper diagonal of a square matrix with point-wise average.
+ * @param [in] n_dims the dimension of the matrix.
+ * @param [in,out] peer_UDiagMatrix the first matrix to be merged.
+ * @param [in,out] neighbor_UDiagMatrix the second matrix to be merged.
+ * @return 0 if it is correct, -2 if peer_UDiagMatrix or neighbor_UDiagMatrix are NULL.
+ */
+int mergeUDiagMatrix(int n_dims, double **peer_UDiagMatrix, double **neighbor_UDiagMatrix);
+/**
+ * This function computes the average consensus on a single value owned by the peers.
+ * This function exits with code -2 if structure is NULL, -1 for error in memory allocation
+ * and -10 for error on merge procedure.
+ * @param [in] params the structure containing the parameters for consensus.
+ * @param [in] graph an igraph_vector_t structure (from igraph).
+ * @param [in] structure an array [1, peers] containing the information to be exchanged.
+ * @return an array [1, peers] containing the estimate for each peer of the total number
+ *          of peers (to be used for estimation of the sum of the value in structure).
+ */
+double* SingleValueAverageConsensus(Params params, igraph_t graph, double* structure);
+/**
+ * This function computes the average consensus on a vector of values owned by the peers.
+ * This function exits with code -2 if structure is NULL, -1 for error in memory allocation
+ * and -10 for error on merge procedure.
+ * @param [in] params the structure containing the parameters for consensus.
+ * @param [in] graph an igraph_vector_t structure (from igraph).
+ * @param [in] structure a matrix [peers, dim] containing the information to be exchanged.
+ * @return an array [1, peers] containing the estimate for each peer of the total number
+ *          of peers (to be used for estimation of the sum of the value in structure).
+ */
 double* VectorAverageConsensus(Params params, igraph_t graph, int dim, double** structure);
+/**
+ * This function computes the average consensus on the upper diagonal of a square matrix
+ * owned by the peers. This function exits with code -2 if structure is NULL, -1 for error
+ * in memory allocation and -10 for error on merge procedure.
+ * @param [in] params the structure containing the parameters for consensus.
+ * @param [in] graph an igraph_vector_t structure (from igraph).
+ * @param [in] structure a cube [peers, dim, dim] containing the information to be exchanged.
+ * @return an array [1, peers] containing the estimate for each peer of the total number
+ *          of peers (to be used for estimation of the sum of the value in structure).
+ */
 double* UDiagMatrixAverageConsensus(Params params, igraph_t graph, int *dim, double*** structure);
+/**
+ * This function computes the average consensus on localsum (clustering information)
+ * owned by the peers. This function exits with code -2 if structure is NULL, -1 for error
+ * in memory allocation and -10 for error on merge procedure.
+ * @param [in] params the structure containing the parameters for consensus.
+ * @param [in] graph an igraph_vector_t structure (from igraph).
+ * @param [in] structure a cube [peers, 2, nCluster] containing the information to be exchanged.
+ * @return an array [1, peers] containing the estimate for each peer of the total number
+ *          of peers (to be used for estimation of the sum of the value in structure).
+ */
 double* LocalSumAverageConsensus(Params params, igraph_t graph, int nCluster, double*** structure);
+/**
+ * This function computes the average consensus on centroids owned by the peers.
+ * This function exits with code -2 if structure is empty and -1 for error
+ * in memory allocation.
+ * @param [in] params the structure containing the parameters for consensus.
+ * @param [in] graph an igraph_vector_t structure (from igraph).
+ * @param [in] structure a cube structure (from Armadillo library) [peers, 2, nCluster]
+ *                          containing the information to be exchanged.
+ * @return an array [1, peers] containing the estimate for each peer of the total number
+ *          of peers (to be used for estimation of the sum of the value in structure).
+ */
 double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure);
 
 int main(int argc, char **argv) {
@@ -890,7 +1058,7 @@ int main(int argc, char **argv) {
 
                 LocalSumAverageConsensus(params, graph, nCluster, localsum);
                 VectorAverageConsensus(params, graph, nCluster, weights);
-                dimestimate = SimpleAverageConsensus(params, graph, error);
+                dimestimate = SingleValueAverageConsensus(params, graph, error);
 
                 for(int peerID = 0; peerID < params.peers; peerID++){
                     for (int clusterID = 0; clusterID < nCluster; ++clusterID) {
@@ -1030,7 +1198,7 @@ int main(int argc, char **argv) {
                 free(c_mean), c_mean = nullptr;
                 free(c_mean_storage), c_mean_storage = nullptr;
 
-                dimestimate = SimpleAverageConsensus(params, graph, wcss_storage);
+                dimestimate = SingleValueAverageConsensus(params, graph, wcss_storage);
 
                 for (int peerID = 0; peerID < params.peers; peerID++) {
                     wcss_storage[peerID] = wcss_storage[peerID] / dimestimate[peerID];
@@ -1124,7 +1292,7 @@ int main(int argc, char **argv) {
                 cluster_dim[peerID] = cluster_size(final[subspaceID][peerID], clusterID, partitionSize[peerID]);
             }
 
-            SimpleAverageConsensus(params, graph, cluster_dim);
+            SingleValueAverageConsensus(params, graph, cluster_dim);
 
             // Reset parameters for convergence estimate
             fill_n(inliers, params.peers, 0);
@@ -1156,8 +1324,8 @@ int main(int argc, char **argv) {
                             subspace[peerID][subspaceID]);
                 }
 
-                SimpleAverageConsensus(params, graph, actual_dist);
-                SimpleAverageConsensus(params, graph, actual_cluster_dim);
+                SingleValueAverageConsensus(params, graph, actual_dist);
+                SingleValueAverageConsensus(params, graph, actual_cluster_dim);
 
                 for (int peerID = 0; peerID < params.peers; peerID++) {
                     double dist_mean = actual_dist[peerID] / actual_cluster_dim[peerID];
@@ -1165,7 +1333,7 @@ int main(int argc, char **argv) {
                             clusterID, discardedPts[peerID][subspaceID], subspace[peerID][subspaceID], dist_mean);
                 }
 
-                SimpleAverageConsensus(params, graph, inliers);
+                SingleValueAverageConsensus(params, graph, inliers);
 
                 // check local convergence
                 for (int peerID = 0; peerID < params.peers; peerID++) {
@@ -1205,7 +1373,7 @@ int main(int argc, char **argv) {
         tot_num_data[peerID] = partitionSize[peerID];
     }
 
-    dimestimate = SimpleAverageConsensus(params, graph, tot_num_data);
+    dimestimate = SingleValueAverageConsensus(params, graph, tot_num_data);
 
     global_outliers = (double **) malloc(params.peers * sizeof(double *));
     if (!global_outliers) {
@@ -1903,32 +2071,32 @@ int computeAverage(double *x, double y) {
     return 0;
 }
 
-int mergeSimpleMessages(int dim, double *peerElem, double *neighborElem) {
-    if (!peerElem || !neighborElem) {
+int mergeVector(int dim, double *peerVector, double *neighborVector) {
+    if (!peerVector || !neighborVector) {
         return NullPointerError(__FUNCTION__);
     }
     for (int j = 0; j < dim; ++j) {
-        computeAverage(&peerElem[j], neighborElem[j]);
+        computeAverage(&peerVector[j], neighborVector[j]);
     }
-    memcpy(neighborElem, peerElem, dim * sizeof(double));
+    memcpy(neighborVector, peerVector, dim * sizeof(double));
     return 0;
 }
 
-int mergeUDiagMatrix(int n_dims, double **UDiagMatrix_X, double **UDiagMatrix_Y) {
-    if (!UDiagMatrix_X || !UDiagMatrix_Y) {
+int mergeUDiagMatrix(int n_dims, double **peer_UDiagMatrix, double **neighbor_UDiagMatrix) {
+    if (!peer_UDiagMatrix || !neighbor_UDiagMatrix) {
         return NullPointerError(__FUNCTION__);
     }
 
     for (int l = 0; l < n_dims; ++l) {
         for (int m = l; m < n_dims; ++m) {
-            computeAverage(&UDiagMatrix_X[l][m], UDiagMatrix_Y[l][m]);
-            UDiagMatrix_X[m][l] = UDiagMatrix_X[l][m];
+            computeAverage(&peer_UDiagMatrix[l][m], neighbor_UDiagMatrix[l][m]);
+            peer_UDiagMatrix[m][l] = peer_UDiagMatrix[l][m];
         }
     }
     return 0;
 }
 
-double* SimpleAverageConsensus(Params params, igraph_t graph, double* structure) {
+double* SingleValueAverageConsensus(Params params, igraph_t graph, double* structure) {
     if (!structure) {
         exit(NullPointerError(__FUNCTION__));
     }
@@ -1937,6 +2105,7 @@ double* SimpleAverageConsensus(Params params, igraph_t graph, double* structure)
     int *convRounds = nullptr;
     int Numberofconverged = params.peers;
     int rounds = 0;
+    int status = 0;
 
     dimestimate = (double *) calloc(params.peers, sizeof(double));
     if (!dimestimate) {
@@ -1986,7 +2155,10 @@ double* SimpleAverageConsensus(Params params, igraph_t graph, double* structure)
                 igraph_integer_t edgeID;
                 igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
 
-                computeAverage(&structure[peerID], structure[neighborID]);
+                status = computeAverage(&structure[peerID], structure[neighborID]);
+                if (status) {
+                    exit(MergeError(__FUNCTION__));
+                }
                 structure[neighborID] = structure[peerID];
                 computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
                 dimestimate[neighborID] = dimestimate[peerID];
@@ -2044,6 +2216,7 @@ double* VectorAverageConsensus(Params params, igraph_t graph, int dim, double** 
     int *convRounds = nullptr;
     int Numberofconverged = params.peers;
     int rounds = 0;
+    int status = 0;
 
     dimestimate = (double *) calloc(params.peers, sizeof(double));
     if (!dimestimate) {
@@ -2093,7 +2266,10 @@ double* VectorAverageConsensus(Params params, igraph_t graph, int dim, double** 
                 igraph_integer_t edgeID;
                 igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
 
-                mergeSimpleMessages(dim, structure[peerID], structure[neighborID]);
+                status = mergeVector(dim, structure[peerID], structure[neighborID]);
+                if (status) {
+                    exit(MergeError(__FUNCTION__));
+                }
                 computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
                 dimestimate[neighborID] = dimestimate[peerID];
             }
@@ -2150,6 +2326,7 @@ double* UDiagMatrixAverageConsensus(Params params, igraph_t graph, int *dim, dou
     int *convRounds = nullptr;
     int Numberofconverged = params.peers;
     int rounds = 0;
+    int status = 0;
 
     dimestimate = (double *) calloc(params.peers, sizeof(double));
     if (!dimestimate) {
@@ -2199,7 +2376,10 @@ double* UDiagMatrixAverageConsensus(Params params, igraph_t graph, int *dim, dou
                 igraph_integer_t edgeID;
                 igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
 
-                mergeUDiagMatrix(dim[peerID], structure[peerID], structure[peerID]);
+                status = mergeUDiagMatrix(dim[peerID], structure[peerID], structure[peerID]);
+                if (status) {
+                    exit(MergeError(__FUNCTION__));
+                }
                 memcpy(structure[neighborID][0], structure[peerID][0], dim[peerID] * dim[peerID] * sizeof(double));
                 computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
                 dimestimate[neighborID] = dimestimate[peerID];
@@ -2257,6 +2437,7 @@ double* LocalSumAverageConsensus(Params params, igraph_t graph, int nCluster, do
     int *convRounds = nullptr;
     int Numberofconverged = params.peers;
     int rounds = 0;
+    int status = 0;
 
     dimestimate = (double *) calloc(params.peers, sizeof(double));
     if (!dimestimate) {
@@ -2307,8 +2488,14 @@ double* LocalSumAverageConsensus(Params params, igraph_t graph, int nCluster, do
                 igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
 
                 for (int l = 0; l < nCluster; ++l) {
-                    computeAverage(&structure[peerID][0][l], structure[neighborID][0][l]);
-                    computeAverage(&structure[peerID][1][l], structure[neighborID][1][l]);
+                    status = computeAverage(&structure[peerID][0][l], structure[neighborID][0][l]);
+                    if (status) {
+                        exit(MergeError(__FUNCTION__));
+                    }
+                    status = computeAverage(&structure[peerID][1][l], structure[neighborID][1][l]);
+                    if (status) {
+                        exit(MergeError(__FUNCTION__));
+                    }
                 }
                 memcpy(structure[neighborID][0], structure[peerID][0], 2 * nCluster * sizeof(double));
                 computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
