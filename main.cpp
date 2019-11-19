@@ -215,7 +215,7 @@ int main(int argc, char **argv) {
     int *num_dims = nullptr;
     //Structures used for Partitioning, PCA and Subspaces
     double ***combine = nullptr, ***corr = nullptr, ****subspace = nullptr;
-    int *cs_dims = nullptr, *uncorr_vars = nullptr, *corr_vars = nullptr, **uncorr = nullptr;
+    int *uncorr_vars = nullptr, *corr_vars = nullptr, **uncorr = nullptr;
     //Structures used for clustering
     double *localsum_storage = nullptr, **localsum_i = nullptr, ***localsum = nullptr, *weights_storage = nullptr,
     **weights = nullptr, *prev_err = nullptr, *error = nullptr;
@@ -242,7 +242,7 @@ int main(int argc, char **argv) {
         goto ON_EXIT;
     }
     for (int i = 0; i < n_data; ++i) {
-        data[i] = &data_storage[i * n_dims];
+        data[i] = (double *) malloc(n_dims * sizeof(double))/*&data_storage[i * n_dims]*/;
     }
 
     if (loadData(inputFilename, data, n_dims)) {
@@ -346,8 +346,9 @@ int main(int argc, char **argv) {
             CenterData(avgsummaries[peerID], n_dims, peerLastItem[peerID-1] + 1, peerLastItem[peerID], data);
         }
     }
-    free(avgsummaries);
-    free(avg_storage);
+    free(avgsummaries), avgsummaries = nullptr;
+    free(avg_storage), avg_storage = nullptr;
+
 
     elapsed = StopTheClock();
     if (!outputOnFile) {
@@ -420,13 +421,13 @@ int main(int argc, char **argv) {
     }
     fill_n(num_dims, params.peers, n_dims);
     UDiagMatrixAverageConsensus(params, graph, num_dims, pcc);
-    free(num_dims);
+    free(num_dims), num_dims = nullptr;
 
     for(int peerID = 0; peerID < params.peers; peerID++){
         computePearsonMatrix(pcc[peerID], squaresum_dims[peerID], n_dims);
     }
-    free(squaresum_dims);
-    free(squaresum_dims_storage);
+    free(squaresum_dims), squaresum_dims = nullptr;
+    free(squaresum_dims_storage), squaresum_dims_storage = nullptr;
 
     elapsed = StopTheClock();
     if (!outputOnFile) {
@@ -517,9 +518,9 @@ int main(int argc, char **argv) {
             }
         }
     }
-    free(pcc);
-    free(pcc_i);
-    free(pcc_storage);
+    free(pcc), pcc = nullptr;
+    free(pcc_i), pcc_i = nullptr;
+    free(pcc_storage), pcc_storage = nullptr;
 
     elapsed = StopTheClock();
     if (!outputOnFile) {
@@ -590,11 +591,17 @@ int main(int argc, char **argv) {
 
         computePCA(covar[peerID], corr[peerID], partitionSize[peerID], corr_vars[peerID], combine[peerID]);
     }
-    free(corr);
-    free(corr_vars);
-    free(covar_storage);
-    free(covar_i);
-    free(covar);
+    for(int i = 0; i < params.peers; i++){
+        for(int j = 0; j < corr_vars[i]; j++){
+            free(corr[i][j]), corr[i][j] = nullptr;
+        }
+        free(corr[i]), corr[i] = nullptr;
+    }
+    free(corr), corr = nullptr;
+    free(covar), covar = nullptr;
+    free(covar_i), covar_i = nullptr;
+    free(covar_storage), covar_storage = nullptr;
+    free(corr_vars), corr_vars = nullptr;
 
     elapsed = StopTheClock();
     if (!outputOnFile) {
@@ -678,24 +685,34 @@ int main(int argc, char **argv) {
             computeLocalCovarianceMatrix(partitionSize[peerID], 3, combine[peerID], covar[peerID]);
         }
 
-        cs_dims = (int *) malloc(params.peers * sizeof(int));
-        if (!cs_dims) {
+        num_dims = (int *) malloc(params.peers * sizeof(int));
+        if (!num_dims) {
             programStatus = memoryError(__FUNCTION__);
             goto ON_EXIT;
         }
-        fill_n(cs_dims, params.peers, 3);
-        UDiagMatrixAverageConsensus(params, graph, cs_dims, covar);
-        free(cs_dims);
+        fill_n(num_dims, params.peers, 3);
+        UDiagMatrixAverageConsensus(params, graph, num_dims, covar);
+        free(num_dims), num_dims = nullptr;
 
         for(int peerID = 0; peerID < params.peers; peerID++) {
             computePCA(covar[peerID], combine[peerID], partitionSize[peerID], 3, subspace[peerID][subspaceID]);
         }
-        free(covar);
-        free(covar_i);
-        free(covar_storage);
+        free(covar), covar = nullptr;
+        free(covar_i), covar_i = nullptr;
+        free(covar_storage), covar_storage = nullptr;
     }
-    free(uncorr);
-    free(combine);
+    for(int i = 0; i < params.peers; i++){
+        free(uncorr[i]), uncorr[i] = nullptr;
+    }
+    free(uncorr), uncorr = nullptr;
+    for(int i = 0; i < params.peers; i++){
+        for(int j = 0; j < 3; j++){
+            free(combine[i][j]), combine[i][j] = nullptr;
+        }
+        free(combine[i]), combine[i] = nullptr;
+    }
+    if(combine != nullptr)
+        free(combine), combine = nullptr;
 
     elapsed = StopTheClock();
     if (!outputOnFile) {
@@ -844,13 +861,13 @@ int main(int argc, char **argv) {
                 }
                 //cerr << "\r Active peers: " << Numberofconverged << "          ";
             }
-            free(localsum_storage);
-            free(localsum_i);
-            free(localsum);
-            free(weights_storage);
-            free(weights);
-            free(prev_err);
-            free(error);
+            free(localsum), localsum = nullptr;
+            free(localsum_i), localsum_i = nullptr;
+            free(localsum_storage), localsum_storage = nullptr;
+            free(weights), weights = nullptr;
+            free(weights_storage), weights_storage = nullptr;
+            free(prev_err), prev_err = nullptr;
+            free(error), error = nullptr;
 
             for(int peerID = 0; peerID < params.peers; peerID++){
                 if (nCluster == 1) {
@@ -945,10 +962,10 @@ int main(int argc, char **argv) {
                     bcss_storage[peerID] = computeBCSS(pts_incluster[peerID], final[subspaceID][peerID].centroids, c_mean[peerID]);
                     wcss_storage[peerID] = computeLocalWCSS(partitionSize[peerID], final[subspaceID][peerID], subspace[peerID][subspaceID]);
                 }
-                free(c_mean_storage);
-                free(c_mean);
-                free(pts_incluster_storage);
-                free(pts_incluster);
+                free(pts_incluster), pts_incluster = nullptr;
+                free(pts_incluster_storage), pts_incluster_storage = nullptr;
+                free(c_mean), c_mean = nullptr;
+                free(c_mean_storage), c_mean_storage = nullptr;
 
                 dimestimate = SimpleAverageConsensus(params, graph, wcss_storage);
 
@@ -956,10 +973,10 @@ int main(int argc, char **argv) {
                     wcss_storage[peerID] = wcss_storage[peerID] / dimestimate[peerID];
                     final[subspaceID][peerID].BetaCV = (nout_storage[peerID] * wcss_storage[peerID]) / (nin_storage[peerID] * bcss_storage[peerID]);
                 }
-                free(nout_storage);
-                free(wcss_storage);
-                free(nin_storage);
-                free(bcss_storage);
+                free(bcss_storage), bcss_storage = nullptr;
+                free(wcss_storage), wcss_storage = nullptr;
+                free(nin_storage), nin_storage = nullptr;
+                free(nout_storage), nout_storage = nullptr;
 
                 if (fabs(prev[0].BetaCV - final[subspaceID][0].BetaCV) <= params.elbowThreshold) {
                     cout << "The optimal K is " << final[subspaceID][0].k << endl;
@@ -971,7 +988,7 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        free(prev);
+        free(prev), prev = nullptr;
     }
 
     elapsed = StopTheClock();
@@ -1098,12 +1115,12 @@ int main(int argc, char **argv) {
                     }
                 }
             }
-            free(actual_dist);
-            free(actual_cluster_dim);
+            free(actual_dist), actual_dist = nullptr;
+            free(actual_cluster_dim), actual_cluster_dim = nullptr;
         }
-        free(inliers);
-        free(prev_inliers);
-        free(cluster_dim);
+        free(inliers), inliers = nullptr;
+        free(prev_inliers), prev_inliers = nullptr;
+        free(cluster_dim), cluster_dim = nullptr;
     }
 
     /***    Final result broadcast to all the peers
@@ -1243,13 +1260,6 @@ int main(int argc, char **argv) {
         }
     }
     //data_out(subspace, peerLastItem, "iris.csv", discardedPts, params.peers, uncorr_vars[0], final[0]);
-    free(tot_num_data);
-    free(global_outliers);
-    free(subspace);
-    free(uncorr_vars);
-    free(discardedPts);
-    free(final);
-    free(final_i);
 
     elapsed = StopTheClock();
     if (!outputOnFile) {
@@ -1258,14 +1268,154 @@ int main(int argc, char **argv) {
 
     igraph_destroy(&graph);
 
-    free(data);
-    free(data_storage);
-    free(dimestimate);
-    free(prevestimate);
-    free(converged);
-    free(convRounds);
-
     ON_EXIT:
+
+    if(data != nullptr)
+        free(data), data = nullptr;
+    if(data_storage != nullptr)
+        free(data_storage), data_storage = nullptr;
+    if(peerLastItem != nullptr)
+        free(peerLastItem), peerLastItem = nullptr;
+    if(partitionSize != nullptr)
+        free(partitionSize), partitionSize = nullptr;
+    if(converged != nullptr)
+        free(converged), converged = nullptr;
+    if(avgsummaries != nullptr)
+        free(avgsummaries), avgsummaries = nullptr;
+    if(avg_storage != nullptr)
+        free(avg_storage), avg_storage = nullptr;
+    if(pcc != nullptr)
+        free(pcc), pcc = nullptr;
+    if(pcc_i != nullptr)
+        free(pcc_i), pcc_i = nullptr;
+    if(pcc_storage != nullptr)
+        free(pcc_storage), pcc_storage = nullptr;
+    if(squaresum_dims != nullptr)
+        free(squaresum_dims), squaresum_dims = nullptr;
+    if(squaresum_dims_storage != nullptr)
+        free(squaresum_dims_storage), squaresum_dims_storage = nullptr;
+    if(num_dims != nullptr)
+        free(num_dims), num_dims = nullptr;
+    for(int i = 0; i < params.peers; i++){
+        if(uncorr[i] != nullptr)
+            free(uncorr[i]), uncorr[i] = nullptr;
+    }
+    if(uncorr != nullptr)
+        free(uncorr), uncorr = nullptr;
+    for(int i = 0; i < params.peers; i++){
+        for(int j = 0; j < corr_vars[i]; j++){
+            if(corr[i][j] != nullptr)
+                free(corr[i][j]), corr[i][j] = nullptr;
+        }
+        if(corr[i] != nullptr)
+            free(corr[i]), corr[i] = nullptr;
+    }
+    if(corr != nullptr)
+        free(corr), corr = nullptr;
+    if(covar != nullptr)
+        free(covar), covar = nullptr;
+    if(covar_i != nullptr)
+        free(covar_i), covar_i = nullptr;
+    if(covar_storage != nullptr)
+        free(covar_storage), covar_storage = nullptr;
+    if(corr_vars != nullptr)
+        free(corr_vars), corr_vars = nullptr;
+    for(int i = 0; i < params.peers; i++){
+        for(int j = 0; j < 3; j++){
+            if(combine[i][j] != nullptr)
+                free(combine[i][j]), combine[i][j] = nullptr;
+        }
+        if(combine[i] != nullptr)
+            free(combine[i]), combine[i] = nullptr;
+    }
+    if(combine != nullptr)
+        free(combine), combine = nullptr;
+    for(int i = 0; i < params.peers; i++){
+        for(int j = 0; j < uncorr_vars[i]; j++){
+            for (int k = 0; k < 2; ++k) {
+                if(subspace[i][j][k] != nullptr)
+                    free(subspace[i][j][k]), subspace[i][j][k] = nullptr;
+            }
+            if(subspace[i][j] != nullptr)
+                free(subspace[i][j]), subspace[i][j] = nullptr;
+        }
+        if(subspace[i] != nullptr)
+            free(subspace[i]), subspace[i] = nullptr;
+    }
+    if(subspace != nullptr)
+        free(subspace), subspace = nullptr;
+    if(final_i != nullptr)
+        free(final_i), final_i = nullptr;
+    if(final != nullptr)
+        free(final), final = nullptr;
+    if(prev != nullptr)
+        free(prev), prev = nullptr;
+    if(localsum != nullptr)
+        free(localsum), localsum = nullptr;
+    if(localsum_i != nullptr)
+        free(localsum_i), localsum_i = nullptr;
+    if(localsum_storage != nullptr)
+        free(localsum_storage), localsum_storage = nullptr;
+    if(weights != nullptr)
+        free(weights), weights = nullptr;
+    if(weights_storage != nullptr)
+        free(weights_storage), weights_storage = nullptr;
+    if(prev_err != nullptr)
+        free(prev_err), prev_err = nullptr;
+    if(error != nullptr)
+        free(error), error = nullptr;
+    if(pts_incluster != nullptr)
+        free(pts_incluster), pts_incluster = nullptr;
+    if(pts_incluster_storage != nullptr)
+        free(pts_incluster_storage), pts_incluster_storage = nullptr;
+    if(c_mean != nullptr)
+        free(c_mean), c_mean = nullptr;
+    if(c_mean_storage != nullptr)
+        free(c_mean_storage), c_mean_storage = nullptr;
+    if(bcss_storage != nullptr)
+        free(bcss_storage), bcss_storage = nullptr;
+    if(wcss_storage != nullptr)
+        free(wcss_storage), wcss_storage = nullptr;
+    if(nin_storage != nullptr)
+        free(nin_storage), nin_storage = nullptr;
+    if(nout_storage != nullptr)
+        free(nout_storage), nout_storage = nullptr;
+    for(int i = 0; i < params.peers; i++){
+        for(int j = 0; j < uncorr_vars[i]; j++){
+            if(discardedPts[i][j] != nullptr)
+                free(discardedPts[i][j]), discardedPts[i][j] = nullptr;
+        }
+        if(discardedPts[i] != nullptr)
+            free(discardedPts[i]), discardedPts[i] = nullptr;
+    }
+    if(discardedPts != nullptr)
+        free(discardedPts), discardedPts = nullptr;
+    if(uncorr_vars != nullptr)
+        free(uncorr_vars), uncorr_vars = nullptr;
+    if(inliers != nullptr)
+        free(inliers), inliers = nullptr;
+    if(prev_inliers != nullptr)
+        free(prev_inliers), prev_inliers = nullptr;
+    if(cluster_dim != nullptr)
+        free(cluster_dim), cluster_dim = nullptr;
+    if(actual_dist != nullptr)
+        free(actual_dist), actual_dist = nullptr;
+    if(actual_cluster_dim != nullptr)
+        free(actual_cluster_dim), actual_cluster_dim = nullptr;
+    if(tot_num_data != nullptr)
+        free(tot_num_data), tot_num_data = nullptr;
+    for(int i = 0; i < params.peers; i++){
+        if(global_outliers[i] != nullptr)
+            free(global_outliers[i]), global_outliers[i] = nullptr;
+    }
+    if(global_outliers != nullptr)
+        free(global_outliers), global_outliers = nullptr;
+    if(dimestimate != nullptr)
+        free(dimestimate), dimestimate = nullptr;
+    if(prevestimate != nullptr)
+        free(prevestimate), prevestimate = nullptr;
+    if(convRounds != nullptr)
+        free(convRounds), convRounds = nullptr;
 
     return programStatus;
 }
