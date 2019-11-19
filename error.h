@@ -8,14 +8,14 @@
 
 using namespace std;
 
-int fileError(string nameFunction);
-int readDatasetError(string nameFunction);
-int memoryError(string nameFunction);
-int partitionError(string nameFunction);
+int MemoryError(string nameFunction);
 int NullPointerError(string nameFunction);
-int findError(string nameFunction);
-int dataError(string nameFunction);
-int arithmeticError(string nameFunction);
-int mergeError(string nameFunction);
+int LessCorrVariablesError(string nameFunction);
+int NoUncorrVariablesError(string nameFunction);
+int ArgumentsError(string nameFunction);
+int DatasetReadingError(string nameFunction);
+int PartitioningDatasetError(string nameFunction);
+int ConversionError(string nameFunction);
+int InputFileError(string nameFunction);
 
 #endif //DISTRIBUTEDADAPTIVECLUSTERING_ERROR_H

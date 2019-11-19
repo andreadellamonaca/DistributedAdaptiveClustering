@@ -6,7 +6,7 @@
  * @param [in] fname the path referred to a CSV file.
  * @param [in,out] dim the number of columns in the CSV file.
  * @param [in,out] data the number of rows in the CSV file.
- * @return 0 if file is read correctly, otherwise -1;
+ * @return 0 if file is read correctly, otherwise -9;
  */
 int getDatasetDims(string fname, int &dim, int &data) {
     dim = 0;
@@ -28,10 +28,8 @@ int getDatasetDims(string fname, int &dim, int &data) {
     }
 
     if (!file.eof()) {
-        cerr << "Could not read file " << fname << "\n";
-        //__throw_invalid_argument("File not found.");
         file.close();
-        return -1;
+        return InputFileError(__FUNCTION__);
     }
 
     cout << "Dataset: #DATA = " << data << " , #DIMENSIONS = " << dim << endl;
@@ -44,7 +42,9 @@ int getDatasetDims(string fname, int &dim, int &data) {
  * @param [in] fname the number of columns in the CSV file.
  * @param [in,out] array a matrix [n_data, n_dims], in which the CSV file is loaded.
  * @param [in] n_dims the number of columns in the CSV file.
- * @return 0 if the dataset is loaded correctly, -2 if array is NULL, otherwise -1.
+ * @return 0 if the dataset is loaded correctly, -2 if array is NULL,
+ *          -8 if there is a conversion error on a read value, -9 if
+ *          there is an error with inputFile.
  */
 int loadData(string fname, double **array, int n_dims) {
     if (!array) {
@@ -67,7 +67,8 @@ int loadData(string fname, double **array, int n_dims) {
                     } catch (const invalid_argument e) {
                         cout << "NaN found in file " << fname << " line " << row
                              << endl;
-                        e.what();
+                        inputFile.close();
+                        return ConversionError(__FUNCTION__);
                     }
                 }
             }
@@ -75,10 +76,8 @@ int loadData(string fname, double **array, int n_dims) {
         row++;
     }
     if (!inputFile.eof()) {
-        cerr << "Could not read file " << fname << endl;
-        //__throw_invalid_argument("File not found.");
         inputFile.close();
-        return -1;
+        return InputFileError(__FUNCTION__);
     }
     inputFile.close();
     return 0;
@@ -131,15 +130,19 @@ int mindistCluster(mat centroids, double first_coordinate, double second_coordin
 /**
  * The algorithm creates the array [1, N_DATA] which indicates the membership of each data to a cluster through an integer.
  * @param [in] data a matrix [n_data, n_dims] on which the K-Means run was made.
- * @param [in] n_data number of rows in the dataset matrix.
+ * @param [in] partitionSize number of rows in the dataset matrix.
  * @param [in,out] instance a cluster_report structure describing the K-Means instance carried out.
  * @return 0 if success, -2 if data or cidx are NULL or centroids is empty.
  */
-int create_cidx_matrix(double **data, int n_data, cluster_report instance) {
-    if (!data || !(instance.cidx) || instance.centroids.is_empty()) {
+int create_cidx_matrix(double **data, int partitionSize, cluster_report &instance) {
+    if (!data || instance.centroids.is_empty()) {
         return NullPointerError(__FUNCTION__);
     }
-    for (int i = 0; i < n_data; ++i) {
+    instance.cidx = (int *) calloc(partitionSize, sizeof(int));
+    if (!instance.cidx) {
+        return MemoryError(__FUNCTION__);
+    }
+    for (int i = 0; i < partitionSize; ++i) {
         instance.cidx[i] = mindistCluster(instance.centroids, data[0][i], data[1][i]);
     }
     return 0;

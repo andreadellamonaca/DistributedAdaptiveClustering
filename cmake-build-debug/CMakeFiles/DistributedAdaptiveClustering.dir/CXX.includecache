@@ -26,6 +26,10 @@ armadillo
 iostream
 -
 
+/home/andrea/Scrivania/DistributedAdaptiveClustering/graph.cpp
+graph.h
+/home/andrea/Scrivania/DistributedAdaptiveClustering/graph.h
+
 /home/andrea/Scrivania/DistributedAdaptiveClustering/graph.h
 igraph/igraph.h
 -
