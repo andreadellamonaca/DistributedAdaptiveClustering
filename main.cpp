@@ -15,19 +15,22 @@
  * A structure containing parameters read from command-line.
  */
 struct Params {
-    int          peers; /**< The number of peers. */
-    string       inputFilename; /**< The path for the input CSV file. */
+    int          peers = 10; /**< The number of peers. */
+    string       inputFilename = "../datasets/Iris.csv"; /**< The path for the input CSV file. */
     string       outputFilename; /**< The path for the output file. */
-    double       convThreshold; /**< The local convergence tolerance for the consensus algorithm. */
-    int          convLimit; /**< The number of consecutive rounds in which a peer must locally converge. */
-    int          graphType; /**< The graph distribution: 1 Geometric, 2 Barabasi-Albert, 3 Erdos-Renyi, 4 Regular (clique) */
-    int          fanOut; /**< The number of communication that a peer can carry out in a round. */
-    int          roundsToExecute; /**< The number of rounds to carry out in the consensus algorithm. */
-    long         k_max; /**< The maximum number of cluster to try for the K-Means algorithm. */
-    double       elbowThreshold; /**< The error tolerance for the selected metric to evaluate the elbow in K-means algorithm. */
-    double       convClusteringThreshold; /**< The local convergence tolerance for distributed K-Means. */
-    double       percentageIncircle; /**< The percentage of points in a cluster to be considered as inliers. */
-    double       percentageSubspaces; /**< The percentage of subspace in which a point must be outlier to be evaluated as general outlier. */
+    double       convThreshold = 0.001; /**< The local convergence tolerance for the consensus algorithm. */
+    int          convLimit = 3; /**< The number of consecutive rounds in which a peer must locally converge. */
+    int          graphType = 2; /**< The graph distribution: 1 Geometric, 2 Barabasi-Albert, 3 Erdos-Renyi,
+ *                                                          4 Regular (clique) */
+    int          fanOut = 3; /**< The number of communication that a peer can carry out in a round. */
+    int          roundsToExecute = -1; /**< The number of rounds to carry out in the consensus algorithm. */
+    long         k_max = 10; /**< The maximum number of cluster to try for the K-Means algorithm. */
+    double       elbowThreshold = 0.25; /**< The error tolerance for the selected metric to evaluate the elbow
+ *                                              in K-means algorithm. */
+    double       convClusteringThreshold = 0.0001; /**< The local convergence tolerance for distributed K-Means. */
+    double       percentageIncircle = 0.9; /**< The percentage of points in a cluster to be considered as inliers. */
+    double       percentageSubspaces = 0.8; /**< The percentage of subspace in which a point must be outlier to be
+ *                                              evaluated as general outlier. */
 };
 
 chrono::high_resolution_clock::time_point t1, t2;
@@ -63,9 +66,10 @@ void usage(char* cmd);
  * @param [in] peers the number of peers.
  * @param [in,out] peerLastItem a long array [1, peers]
  * @param [in,out] partitionSize a long array [1, peers]
- * @return 0 if it is correct, -2 if peerLastItem or partitionSize are null, otherwise -7.
+ * @return 0 if it is correct, -1 for memory allocation error on peerLastItem or
+ *          partitionSize, otherwise -7.
  */
-int partitionData(int n_data, int peers, long *peerLastItem, long *partitionSize);
+int partitionData(int n_data, int peers, long **peerLastItem, long **partitionSize);
 /**
  * This function prints the parameters used for the run.
  * @param [in] params the structure with parameters.
@@ -173,6 +177,20 @@ int computeLocalCovarianceMatrix(long partitionSize, int covarMatrixDim, double 
  * @return 0 if it is correct, -2 if covarianceMatrix, oldSpace or newSpace are NULL.
  */
 int computePCA(double **covarianceMatrix, double **oldSpace, long partitionSize, int n_dims, double **newSpace);
+/**
+ * This function runs the K-Means on the part of the dataset owned by a single peer. It
+ * computes the local sum of the points in each cluster, the cardinality of each cluster (weights)
+ * and the associated error.
+ * @param [in] partitionSize the number of elements managed by the peer.
+ * @param [in] centroids a mat structure (from Armadillo).
+ * @param [in] subspace a matrix [2, partitionSize] containing the data on which
+ *                      executes clustering.
+ * @param [in,out] weights an array [1, nCluster] containing the cardinality of the clusters.
+ * @param [in,out] localsum a matrix [2, nCluster] containing the local sum of the points in each cluster.
+ * @param [in,out] error a double value containing the overall error between centroids and points in the
+ *                          associated cluster.
+ * @return 0 if it is correct, -2 if subspace, weights, localsum are NULL or centroids is empty;
+ */
 int computeLocalKMeans(long partitionSize, mat centroids, double **subspace, double *weights, double **localsum, double &error);
 /**
  * This function computes the mean on each of the 2 dimensions in data for a single peer.
@@ -222,7 +240,7 @@ double computeBCSS(double *pts_incluster, mat centroids, double *c_mean);
  *                  clustering was executed.
  * @return a double value indicating the inter-cluster distance.
  */
-double computeLocalWCSS(long partitionSize, cluster_report rep, double **subspace);
+double computeLocalWCweight(long partitionSize, cluster_report rep, double **subspace);
 /**
  * This function computes the distance between each point (not discarded previously)
  * managed by a single peer and its centroids.
@@ -366,47 +384,20 @@ int main(int argc, char **argv) {
     int n_data; // number of data
     long *peerLastItem = NULL; // index of a peer last item
     long *partitionSize = NULL; // size of a peer partition
-    int peers = 10; // number of peers
-    int fanOut = 3; //fan-out of peers
-    int graphType = 2; // graph distribution: 1 geometric 2 Barabasi-Albert 3 Erdos-Renyi 4 regular (clique)
-    double convThreshold = 0.001; // local convergence tolerance
-    int convLimit = 3; // number of consecutive rounds in which a peer must locally converge
-    int roundsToExecute = -1;
-    long k_max = 10; // max number of clusters to try in elbow criterion
-    double elbowThreshold = 0.25; // threshold for the selection of optimal number of clusters in Elbow method
-    double convClusteringThreshold = 0.0001; // local convergence tolerance for distributed clustering
-    double percentageIncircle = 0.9; // percentage of points in a cluster to be evaluated as inlier
-    double percentageSubspaces = 0.8; // percentage of subspaces in which a point must be outlier to be
-                                        // evaluated as general outlier
     Params          params;
     bool            outputOnFile;
-    string          inputFilename = "../datasets/Iris.csv";
-    string          outputFilename;
     igraph_t        graph;
     int             programStatus = -12;
     double          elapsed;
 
-    /*** Assign parameters defined a priori ***/
-    params.peers = peers;
-    params.fanOut = fanOut;
-    params.graphType = graphType;
-    params.convThreshold = convThreshold;
-    params.convLimit = convLimit;
-    params.outputFilename = outputFilename;
-    params.roundsToExecute = roundsToExecute;
-    params.elbowThreshold = elbowThreshold;
-    params.convClusteringThreshold = convClusteringThreshold;
-    params.k_max = k_max;
-    params.percentageIncircle = percentageIncircle;
-    params.percentageSubspaces = percentageSubspaces;
-    params.inputFilename = inputFilename;
+    programStatus = parseCommandLine(argv, argc, params);
+    if (programStatus) {
+        return programStatus;
+    }
     outputOnFile = params.outputFilename.size() > 0;
-
     if (!outputOnFile) {
         printUsedParameters(params);
     }
-
-    programStatus = parseCommandLine(argv, argc, params);
 
     //Structures used for consensus or convergence procedures
     double *dimestimate = nullptr;
@@ -416,25 +407,25 @@ int main(int argc, char **argv) {
     double *data_storage = nullptr, **data = nullptr, *avg_storage = nullptr, **avgsummaries = nullptr;
     //Structures used for pcc and covariance computation
     double *pcc_storage = nullptr, **pcc_i = nullptr, ***pcc = nullptr, **squaresum_dims = nullptr,
-    *squaresum_dims_storage = nullptr, *covar_storage = nullptr, **covar_i = nullptr, ***covar = nullptr;
+            *squaresum_dims_storage = nullptr, *covar_storage = nullptr, **covar_i = nullptr, ***covar = nullptr;
     int *num_dims = nullptr;
     //Structures used for Partitioning, PCA and Subspaces
     double ***combine = nullptr, ***corr = nullptr, ****subspace = nullptr;
     int *uncorr_vars = nullptr, *corr_vars = nullptr, **uncorr = nullptr;
     //Structures used for clustering
     double *localsum_storage = nullptr, **localsum_i = nullptr, ***localsum = nullptr, *weights_storage = nullptr,
-    **weights = nullptr, *prev_err = nullptr, *error = nullptr;
+            **weights = nullptr, *prev_err = nullptr, *error = nullptr;
     cluster_report *final_i = nullptr, **final = nullptr, *prev = nullptr;
     //Structures used for BetaCV
     double *pts_incluster_storage = nullptr, **pts_incluster = nullptr, *c_mean_storage = nullptr, **c_mean = nullptr,
-    *bcss_storage = nullptr, *wcss_storage = nullptr, *nin_storage = nullptr, *nout_storage = nullptr;
+            *BC_weight = nullptr, *WC_weight = nullptr, *Nin_edges = nullptr, *Nout_edges = nullptr;
     //Structures used for outlier identification
     double *inliers = nullptr, *prev_inliers = nullptr, *cluster_dim = nullptr, *actual_dist = nullptr,
-    *actual_cluster_dim = nullptr, *tot_num_data = nullptr, **global_outliers = nullptr;
+            *actual_cluster_dim = nullptr, *tot_num_data = nullptr, **global_outliers = nullptr;
     bool ***discardedPts = nullptr;
 
     /*** Dataset Loading ***/
-    programStatus = getDatasetDims(inputFilename, n_dims, n_data);
+    programStatus = getDatasetDims(params.inputFilename, n_dims, n_data);
     if (programStatus) {
         return programStatus;
     }
@@ -453,25 +444,14 @@ int main(int argc, char **argv) {
         data[i] = &data_storage[i * n_dims];
     }
 
-    programStatus = loadData(inputFilename, data, n_dims);
+    programStatus = loadData(params.inputFilename, data, n_dims);
     if (programStatus) {
         programStatus = DatasetReadingError(__FUNCTION__);
         goto ON_EXIT;
     }
 
     /*** Partitioning phase ***/
-    peerLastItem = (long *) calloc(peers, sizeof(long));
-    if (!peerLastItem) {
-        programStatus = MemoryError(__FUNCTION__);
-        goto ON_EXIT;
-    }
-    partitionSize = (long *) calloc(peers, sizeof(long));
-    if (!partitionSize) {
-        programStatus = MemoryError(__FUNCTION__);
-        goto ON_EXIT;
-    }
-
-    programStatus = partitionData(n_data, peers, peerLastItem, partitionSize);
+    programStatus = partitionData(n_data, params.peers, &peerLastItem, &partitionSize);
     if (programStatus) {
         goto ON_EXIT;
     }
@@ -486,21 +466,20 @@ int main(int argc, char **argv) {
     StartTheClock();
 
     graph = generateRandomGraph(params.graphType, params.peers);
-    // determine minimum and maximum vertex degree for the graph
-    igraph_vector_t result;
-    result = getMinMaxVertexDeg(graph, outputOnFile);
-    igraph_vector_destroy(&result);
+//    igraph_vector_t result;
+//    result = getMinMaxVertexDeg(graph, outputOnFile);
+//    igraph_vector_destroy(&result);
 
     elapsed = StopTheClock();
     if (!outputOnFile) {
-        cout <<"Time (seconds) required to generate the graph: " << elapsed << endl;
-        cout <<"Applying Dataset Standardization to each peer' substream..." << endl;
+        cout << "Time (seconds) required to generate the graph: " << elapsed << endl;
+        cout << endl << "Applying Dataset Standardization to each peer' substream..." << endl;
     }
 
     /***    Dataset Standardization
      * The dataset is centered around the mean value.
      * 1) Each peer computes the local average, for each dimension, on its dataset
-     * partition and saves the values on "avgsummaries".
+     * partition and stores the values on "avgsummaries".
      * 2) An average consensus is executed on the average value for each dimension.
      * 3) Each peer centers its dataset partition on the average reached with consensus.
     ***/
@@ -523,7 +502,7 @@ int main(int argc, char **argv) {
             programStatus = computeLocalAverage(data, n_dims, 0, peerLastItem[peerID], avgsummaries[peerID]);
         } else {
             programStatus = computeLocalAverage(data, n_dims, peerLastItem[peerID-1] + 1, peerLastItem[peerID],
-                    avgsummaries[peerID]);
+                                                avgsummaries[peerID]);
         }
         if (programStatus) {
             goto ON_EXIT;
@@ -537,7 +516,7 @@ int main(int argc, char **argv) {
             programStatus = CenterData(avgsummaries[peerID], n_dims, 0, peerLastItem[peerID], data);
         } else {
             programStatus = CenterData(avgsummaries[peerID], n_dims, peerLastItem[peerID-1] + 1,
-                    peerLastItem[peerID], data);
+                                       peerLastItem[peerID], data);
         }
         if (programStatus) {
             goto ON_EXIT;
@@ -549,7 +528,7 @@ int main(int argc, char **argv) {
     elapsed = StopTheClock();
     if (!outputOnFile) {
         cout << "Time (seconds) required to standardize the dataset: " << elapsed << endl;
-        cout << "Computing Pearson matrix globally..." << endl;
+        cout << endl << "Computing Pearson matrix globally..." << endl;
     }
 
     /***    Pearson Matrix Computation
@@ -560,8 +539,7 @@ int main(int argc, char **argv) {
      *      the denominator (on squaresum_dims) of the previous r_xy for
      *      each pair of dimensions.
      * 2) A consensus on the sum of pcc and squaresum_dims is executed.
-     * 3) Each peer computes the Pearson matrix with the values resulting
-     *      from consensus.
+     * 3) Each peer computes the Pearson matrix with the values resulting from consensus.
     ***/
     StartTheClock();
 
@@ -600,10 +578,10 @@ int main(int argc, char **argv) {
 
         if (peerID == 0) {
             programStatus = computeLocalPCC(pcc[peerID], squaresum_dims[peerID], n_dims, 0,
-                    peerLastItem[peerID], data);
+                                            peerLastItem[peerID], data);
         } else {
             programStatus = computeLocalPCC(pcc[peerID], squaresum_dims[peerID], n_dims,
-                    peerLastItem[peerID-1] + 1, peerLastItem[peerID], data);
+                                            peerLastItem[peerID-1] + 1, peerLastItem[peerID], data);
         }
         if (programStatus) {
             goto ON_EXIT;
@@ -633,11 +611,19 @@ int main(int argc, char **argv) {
     elapsed = StopTheClock();
     if (!outputOnFile) {
         cout << "Time (seconds) required to compute the Pearson matrix: " << elapsed << endl;
-        cout << "Partitioning dimensions in CORR and UNCORR sets..." << endl;
+        cout << endl << "Partitioning dimensions in CORR and UNCORR sets..." << endl;
+    }
+
+    cout << "PERAROAOIFNSIU"<< endl;
+    for (int m = 0; m < n_dims; ++m) {
+        for (int k = 0; k < n_dims; ++k) {
+            cout << pcc[0][m][k] << " ";
+        }
+        cout << endl;
     }
 
     /***    CORR And UNCORR Partitioning
-     * Locally each peer partition the dimensions in CORR and UNCORR sets
+     * Locally each peer partitions the dimensions in CORR and UNCORR sets
      * based on the row-wise sum of the Pearson coefficient for each dimension.
      * The structures corr_vars and uncorr_vars keep records of the
      * cardinality of CORR and UNCORR sets, while "corr" contains the peers'
@@ -675,7 +661,7 @@ int main(int argc, char **argv) {
 
         if (peerID == 0) {
             cout << "Correlated dimensions: " << corr_vars[peerID] << ", " << "Uncorrelated dimensions: "
-                << uncorr_vars[peerID] << endl;
+                 << uncorr_vars[peerID] << endl;
             if (corr_vars[peerID] < 2) {
                 programStatus = LessCorrVariablesError(__FUNCTION__);
                 goto ON_EXIT;
@@ -710,10 +696,10 @@ int main(int argc, char **argv) {
             if (isCorrDimension(n_dims, dimensionID, pcc[peerID])) {
                 if (peerID == 0) {
                     programStatus = copyDimension(data, corr_vars[peerID], dimensionID, 0,
-                            peerLastItem[peerID], corr[peerID]);
+                                                  peerLastItem[peerID], corr[peerID]);
                 } else {
                     programStatus = copyDimension(data, corr_vars[peerID], dimensionID,
-                            peerLastItem[peerID - 1] + 1, peerLastItem[peerID], corr[peerID]);
+                                                  peerLastItem[peerID - 1] + 1, peerLastItem[peerID], corr[peerID]);
                 }
                 if (programStatus) {
                     goto ON_EXIT;
@@ -732,7 +718,7 @@ int main(int argc, char **argv) {
     elapsed = StopTheClock();
     if (!outputOnFile) {
         cout << "Time (seconds) required to partition the dimensions in CORR and UNCORR: " << elapsed << endl;
-        cout << "Computing Principal Component Analysis on CORR set..." << endl;
+        cout << endl << "Computing Principal Component Analysis on CORR set..." << endl;
     }
 
     /***    Principal Component Analysis on CORR set
@@ -740,8 +726,7 @@ int main(int argc, char **argv) {
      *      partition of CORR set and saves the result in "covar".
      * 2) An average consensus on the covariance matrix is executed.
      * 3) Locally each peer computes eigenvalues/eigenvectors (with Armadillo
-     *      functions), get the 2 Principal Components and save them
-     *      in "combine".
+     *      functions), get the 2 Principal Components and store them in "combine".
     ***/
     StartTheClock();
 
@@ -769,7 +754,7 @@ int main(int argc, char **argv) {
 
     for(int peerID = 0; peerID < params.peers; peerID++){
         programStatus = computeLocalCovarianceMatrix(partitionSize[peerID], corr_vars[peerID],
-                corr[peerID], covar[peerID]);
+                                                     corr[peerID], covar[peerID]);
         if (programStatus) {
             goto ON_EXIT;
         }
@@ -798,7 +783,7 @@ int main(int argc, char **argv) {
         }
 
         programStatus = computePCA(covar[peerID], corr[peerID], partitionSize[peerID], corr_vars[peerID],
-                combine[peerID]);
+                                   combine[peerID]);
         if (programStatus) {
             goto ON_EXIT;
         }
@@ -817,17 +802,16 @@ int main(int argc, char **argv) {
     elapsed = StopTheClock();
     if (!outputOnFile) {
         cout << "Time (seconds) required to apply PCA on CORR set: " << elapsed << endl;
-        cout << "Computing Candidate Subspaces through Principal Component Analysis"
+        cout << endl << "Computing Candidate Subspaces through Principal Component Analysis"
                 " on PC1corr, PC2corr and each dimension in the UNCORR set..." << endl;
     }
 
     /***    Candidate Subspaces Creation
-     * 1) Locally each peer copies its dataset partition of the m-th
-     *      dimension in UNCORR set and computes the covariance matrix.
+     * 1) Locally each peer copies its dataset partition of the m-th dimension in
+     * UNCORR set and computes the covariance matrix.
      * 2) An average consensus on the covariance matrix is executed.
-     * 3) Locally each peer computes eigenvalues/eigenvectors (with
-     *      Armadillo functions), get the 2 Principal Components and
-     *      save them in "subspace".
+     * 3) Locally each peer computes eigenvalues/eigenvectors (with Armadillo functions),
+     * get the 2 Principal Components and store them in "subspace".
      * These operations are done for each dimension in UNCORR set.
     ***/
     StartTheClock();
@@ -886,17 +870,17 @@ int main(int argc, char **argv) {
             for (int i = 0; i < partitionSize[peerID]; ++i) {
                 if (peerID == 0) {
                     programStatus = copyDimension(data, 2, uncorr[peerID][subspaceID], 0,
-                            peerLastItem[peerID], combine[peerID]);
+                                                  peerLastItem[peerID], combine[peerID]);
                 } else {
                     programStatus = copyDimension(data, 2, uncorr[peerID][subspaceID],
-                            peerLastItem[peerID - 1] + 1, peerLastItem[peerID], combine[peerID]);
+                                                  peerLastItem[peerID - 1] + 1, peerLastItem[peerID], combine[peerID]);
                 }
                 if (programStatus) {
                     goto ON_EXIT;
                 }
             }
             programStatus = computeLocalCovarianceMatrix(partitionSize[peerID], 3, combine[peerID],
-                    covar[peerID]);
+                                                         covar[peerID]);
             if (programStatus) {
                 goto ON_EXIT;
             }
@@ -913,7 +897,7 @@ int main(int argc, char **argv) {
 
         for(int peerID = 0; peerID < params.peers; peerID++) {
             programStatus = computePCA(covar[peerID], combine[peerID], partitionSize[peerID], 3,
-                    subspace[peerID][subspaceID]);
+                                       subspace[peerID][subspaceID]);
             if (programStatus) {
                 goto ON_EXIT;
             }
@@ -936,27 +920,24 @@ int main(int argc, char **argv) {
     elapsed = StopTheClock();
     if (!outputOnFile) {
         cout << "Time (seconds) required to create the candidate subspaces: " << elapsed << endl;
-        cout << "Computing distributed clustering..." << endl;
+        cout << endl << "Computing distributed clustering..." << endl;
     }
 
     /***    Distributed K-Means
-     * For each candidate subspace, peers cooperate to pick the optimal
-     * number of clusters with the elbow criterion based on BetaCV metric.
-     * The result of the clustering is saved in the structure "final".
-     * 1) Peer 0 chooses a set of centroids randomly and broadcast them
-     *      (this operation is done through an average consensus).
-     * 2) All the peers start the distributed K-Means.
-     *      Locally they compute the sum of all the coordinates in each cluster,
-     *      the cardinality of each cluster coordinates' set and the local sum
-     *      of squared errors. Then they save these informations in "localsum",
-     *      "weights" and "error".
+     * For each candidate subspace, peers cooperate to pick the optimal number of
+     * clusters with the elbow criterion based on BetaCV metric. The result of the
+     * clustering is stored in the structure "final".
+     * 1) Peer 0 chooses a set of centroids randomly and broadcast them (through average consensus).
+     * 2) All the peers start the distributed K-Means: Locally they compute the sum
+     *      of all the coordinates in each cluster, the cardinality of each cluster
+     *      coordinates' set and the local sum of squared errors. Then they store these
+     *      informations in "localsum", "weights" and "error".
      * 3) An average consensus on the sum of localsum, weights and error is executed.
      * 4) The peers compute the new centroids and if the condition about the actual
      *      error and the previous error is satisfied, they stop the distributed
      *      K-Means with the number of cluster chosen for this run.
-     * 5) They start the evaluation of BetaCV metric for the elbow criterion.
-     *      If the condition about the elbow is satisfied, the distributed clustering
-     *      for the actual candidate subspace is stopped.
+     * 5) They start the evaluation of BetaCV metric for the elbow criterion. If the condition
+     *      about the elbow is satisfied, the distributed clustering for the actual candidate subspace is stopped.
     ***/
     StartTheClock();
 
@@ -1050,7 +1031,7 @@ int main(int argc, char **argv) {
                         continue;
 
                     programStatus = computeLocalKMeans(partitionSize[peerID], centroids.slice(peerID),
-                            subspace[peerID][subspaceID], weights[peerID], localsum[peerID], error[peerID]);
+                                                       subspace[peerID][subspaceID], weights[peerID], localsum[peerID], error[peerID]);
                     if (programStatus) {
                         goto ON_EXIT;
                     }
@@ -1103,17 +1084,14 @@ int main(int argc, char **argv) {
                 }
             }
             /***    BetaCV Metric Computation
-             * The peers need the intra-cluster (WCSS) and the inter-cluster (BCSS)
-             * sum of squares, the number of distinct intra-cluster (N_in) and
-             * inter-cluster (N_out) edges to compute BetaCV.
-             * For N_in and N_out, the peers get the number of elements in each
-             * cluster with an average consensus on the sum of "pts_incluster".
-             * For BCSS, the peers get the mean of all the points  with an average
-             * consensus on "c_mean".
-             * Locally all the peers compute N_in, N_out, BCSS and the local estimate
-             * of WCSS; then the general WCSS is reached with an average consensus on
-             * the sum of WCSS.
-             * After that each peer can compute the BetaCV metric locally and evaluates
+             * The peers need the intra-cluster (WC) and the inter-cluster (BC) weights,
+             * the number of distinct intra-cluster (N_in) and inter-cluster (N_out) edges
+             * to compute BetaCV.  For N_in and N_out, the peers get the number of elements
+             * in each cluster with an average consensus on the sum of "pts_incluster".
+             * For BC, the peers get the mean of all the points  with an average consensus 
+             * on "c_mean". Locally all the peers compute N_in, N_out, BC and the local estimate
+             * of WC; then the general WC is reached with an average consensus on the sum of WC.
+             * After that each peer computes the BetaCV metric locally and evaluates
              * the elbow criterion condition.
             ***/
             if (nCluster > 1) {
@@ -1142,12 +1120,12 @@ int main(int argc, char **argv) {
                     c_mean[peerID] = &c_mean_storage[peerID * 2];
 
                     programStatus = computeLocalC_Mean(subspace[peerID][subspaceID], partitionSize[peerID],
-                            c_mean[peerID]);
+                                                       c_mean[peerID]);
                     if (programStatus) {
                         goto ON_EXIT;
                     }
                     programStatus = computeLocalPtsIncluster(partitionSize[peerID], pts_incluster[peerID],
-                            final[subspaceID][peerID]);
+                                                             final[subspaceID][peerID]);
                     if (programStatus) {
                         goto ON_EXIT;
                     }
@@ -1162,52 +1140,52 @@ int main(int argc, char **argv) {
                     }
                 }
 
-                bcss_storage = (double *) calloc(params.peers, sizeof(double));
-                if (!bcss_storage) {
+                BC_weight = (double *) calloc(params.peers, sizeof(double));
+                if (!BC_weight) {
                     programStatus = MemoryError(__FUNCTION__);
                     goto ON_EXIT;
                 }
-                wcss_storage = (double *) calloc(params.peers, sizeof(double));
-                if (!wcss_storage) {
+                WC_weight = (double *) calloc(params.peers, sizeof(double));
+                if (!WC_weight) {
                     programStatus = MemoryError(__FUNCTION__);
                     goto ON_EXIT;
                 }
-                nin_storage = (double *) calloc(params.peers, sizeof(double));
-                if (!nin_storage) {
+                Nin_edges = (double *) calloc(params.peers, sizeof(double));
+                if (!Nin_edges) {
                     programStatus = MemoryError(__FUNCTION__);
                     goto ON_EXIT;
                 }
-                nout_storage = (double *) calloc(params.peers, sizeof(double));
-                if (!nout_storage) {
+                Nout_edges = (double *) calloc(params.peers, sizeof(double));
+                if (!Nout_edges) {
                     programStatus = MemoryError(__FUNCTION__);
                     goto ON_EXIT;
                 }
                 for (int peerID = 0; peerID < params.peers; peerID++) {
-                    programStatus = computeNin_Nout(nCluster, pts_incluster[peerID], nin_storage[peerID],
-                            nout_storage[peerID]);
+                    programStatus = computeNin_Nout(nCluster, pts_incluster[peerID], Nin_edges[peerID],
+                                                    Nout_edges[peerID]);
                     if (programStatus) {
                         goto ON_EXIT;
                     }
-                    bcss_storage[peerID] = computeBCSS(pts_incluster[peerID], final[subspaceID][peerID].centroids,
-                            c_mean[peerID]);
-                    wcss_storage[peerID] = computeLocalWCSS(partitionSize[peerID], final[subspaceID][peerID],
-                            subspace[peerID][subspaceID]);
+                    BC_weight[peerID] = computeBCSS(pts_incluster[peerID], final[subspaceID][peerID].centroids,
+                                                    c_mean[peerID]);
+                    WC_weight[peerID] = computeLocalWCweight(partitionSize[peerID], final[subspaceID][peerID],
+                                                             subspace[peerID][subspaceID]);
                 }
                 free(pts_incluster), pts_incluster = nullptr;
                 free(pts_incluster_storage), pts_incluster_storage = nullptr;
                 free(c_mean), c_mean = nullptr;
                 free(c_mean_storage), c_mean_storage = nullptr;
 
-                dimestimate = SingleValueAverageConsensus(params, graph, wcss_storage);
+                dimestimate = SingleValueAverageConsensus(params, graph, WC_weight);
 
                 for (int peerID = 0; peerID < params.peers; peerID++) {
-                    wcss_storage[peerID] = wcss_storage[peerID] / dimestimate[peerID];
-                    final[subspaceID][peerID].BetaCV = (nout_storage[peerID] * wcss_storage[peerID]) / (nin_storage[peerID] * bcss_storage[peerID]);
+                    WC_weight[peerID] = WC_weight[peerID] / dimestimate[peerID];
+                    final[subspaceID][peerID].BetaCV = (Nout_edges[peerID] * WC_weight[peerID]) / (Nin_edges[peerID] * BC_weight[peerID]);
                 }
-                free(bcss_storage), bcss_storage = nullptr;
-                free(wcss_storage), wcss_storage = nullptr;
-                free(nin_storage), nin_storage = nullptr;
-                free(nout_storage), nout_storage = nullptr;
+                free(BC_weight), BC_weight = nullptr;
+                free(WC_weight), WC_weight = nullptr;
+                free(Nin_edges), Nin_edges = nullptr;
+                free(Nout_edges), Nout_edges = nullptr;
 
                 if (fabs(prev[0].BetaCV - final[subspaceID][0].BetaCV) <= params.elbowThreshold) {
                     cout << "The optimal K is " << final[subspaceID][0].k << endl;
@@ -1225,28 +1203,24 @@ int main(int argc, char **argv) {
     elapsed = StopTheClock();
     if (!outputOnFile) {
         cout << "Time (seconds) required to run K-Means: " << elapsed << endl;
-        cout << "Starting the outlier identification process..." << endl;
+        cout << endl << "Starting the outlier identification process..." << endl;
     }
 
     /***    Outliers Identification On Each Candidate Subspace
      * For each cluster:
-     * 1) Each peer computes the local cluster size and saves it
-     *      in "cluster_dim".
-     * 2) The cardinality of the cluster is computed with an average
-     *      consensus on "cluster_dim".
-     * Then it starts the distributed outlier identification.
-     * 1) Each peer computes the actual cluster dimension (cluster
-     *      dimension without points discarded, considered as inliers
-     *      in previous iterations) and saves it in "actual_cluster_dim"
-     *      and the distance between the points and the centroids.
-     * 2) These informations are exchanged with an average consensus and
-     *      after that each peer can compute the radius of the circle used
-     *      to discard points considered as inliers.
-     * 3) Each peer evaluates the remaining points and if there are
-     *      inliers, it updates "inliers".
-     * 4) This information is exchanged with an average consensus on the sum
-     *      of "inliers" and if one of the conditions on the inliers is satisfied,
-     *      the outlier identification for the actual cluster is stopped.
+     * 1) Each peer computes the local cluster size and saves it in "cluster_dim".
+     * 2) The cardinality of the cluster is computed with an average consensus on
+     *      "cluster_dim".
+     * Then it starts the distributed outlier identification:
+     * 1) Each peer computes the actual cluster dimension (cluster dimension without
+     *      points discarded, considered as inliers in previous iterations) and stores
+     *      it in "actual_cluster_dim" and the distance between the points and the centroids.
+     * 2) These informations are exchanged with an average consensus and after that each peer
+     *      computes the radius of the circle used to discard points considered as inliers.
+     * 3) Each peer evaluates the remaining points and if there are inliers, it updates "inliers".
+     * 4) This information is exchanged with an average consensus on the sum of "inliers" and if
+     *      one of the conditions on the inliers is satisfied, the outlier identification for the
+     *      actual cluster is stopped.
     ***/
     StartTheClock();
     // Structure to keep record of inliers for each peer (for Outlier identification)
@@ -1321,7 +1295,7 @@ int main(int argc, char **argv) {
                             final[subspaceID][peerID], clusterID, discardedPts[peerID][subspaceID]);
                     actual_dist[peerID] = computeLocalClusterDistance(partitionSize[peerID],
                             final[subspaceID][peerID], clusterID, discardedPts[peerID][subspaceID],
-                            subspace[peerID][subspaceID]);
+                                                                      subspace[peerID][subspaceID]);
                 }
 
                 SingleValueAverageConsensus(params, graph, actual_dist);
@@ -1356,12 +1330,10 @@ int main(int argc, char **argv) {
     }
 
     /***    Final result broadcast to all the peers
-     * Each peer sets "tot_num_data" to its partition size and then
-     * all the peers estimate the total number of data with an average
-     * consensus on the sum of "tot_num_data".
-     * Each peer fills "global_outliers" with the local information, then
-     * the global solution is reached with an average consensus on the sum
-     * of each element in "global_outliers".
+     * Each peer sets "tot_num_data" to its partition size and then all the peers
+     * estimate the total number of data with an average consensus on the sum of "tot_num_data".
+     * Each peer fills "global_outliers" with the local information, then the global solution is
+     * reached with an average consensus on the sum of each element in "global_outliers".
      * Finally peer 0 is queried to get the final result.
     ***/
     tot_num_data = (double *) calloc(params.peers, sizeof(double));
@@ -1392,11 +1364,11 @@ int main(int argc, char **argv) {
 
         if (peerID == 0) {
             programStatus = getCountOutliersinSubspace(uncorr_vars[peerID], partitionSize[peerID],
-                    0, discardedPts[peerID], global_outliers[peerID]);
+                                                       0, discardedPts[peerID], global_outliers[peerID]);
         } else {
             int index = peerLastItem[peerID - 1] + 1;
             programStatus = getCountOutliersinSubspace(uncorr_vars[peerID], partitionSize[peerID],
-                    index, discardedPts[peerID], global_outliers[peerID]);
+                                                       index, discardedPts[peerID], global_outliers[peerID]);
         }
         if (programStatus) {
             goto ON_EXIT;
@@ -1553,14 +1525,14 @@ int main(int argc, char **argv) {
         free(c_mean), c_mean = nullptr;
     if(c_mean_storage != nullptr)
         free(c_mean_storage), c_mean_storage = nullptr;
-    if(bcss_storage != nullptr)
-        free(bcss_storage), bcss_storage = nullptr;
-    if(wcss_storage != nullptr)
-        free(wcss_storage), wcss_storage = nullptr;
-    if(nin_storage != nullptr)
-        free(nin_storage), nin_storage = nullptr;
-    if(nout_storage != nullptr)
-        free(nout_storage), nout_storage = nullptr;
+    if(BC_weight != nullptr)
+        free(BC_weight), BC_weight = nullptr;
+    if(WC_weight != nullptr)
+        free(WC_weight), WC_weight = nullptr;
+    if(Nin_edges != nullptr)
+        free(Nin_edges), Nin_edges = nullptr;
+    if(Nout_edges != nullptr)
+        free(Nout_edges), Nout_edges = nullptr;
     if(inliers != nullptr)
         free(inliers), inliers = nullptr;
     if(prev_inliers != nullptr)
@@ -1716,9 +1688,16 @@ void usage(char* cmd)
             << "-if         input filename" << endl << endl;
 }
 
-int partitionData(int n_data, int peers, long *peerLastItem, long *partitionSize) {
-    if (!peerLastItem || !partitionSize) {
-        return NullPointerError(__FUNCTION__);
+int partitionData(int n_data, int peers, long **peerLastItem, long **partitionSize) {
+
+    *peerLastItem = (long *) calloc(peers, sizeof(long));
+    if (!(*peerLastItem)) {
+        return MemoryError(__FUNCTION__);
+    }
+    *partitionSize = (long *) calloc(peers, sizeof(long));
+    if (!(*partitionSize)) {
+        free(*peerLastItem), *peerLastItem = nullptr;
+        return MemoryError(__FUNCTION__);
     }
     std::random_device rd; // obtain a random number from hardware
     std::mt19937 eng(rd()); // seed the generator
@@ -1728,18 +1707,18 @@ int partitionData(int n_data, int peers, long *peerLastItem, long *partitionSize
         float rnd = distr(eng);
         //cerr << "rnd: " << rnd << "\n";
         long last_item = rnd * ((float)n_data/(float)peers) * 0.1 + (float) (i+1) * ((float)n_data/(float)peers) - 1;
-        peerLastItem[i] = last_item;
+        (*peerLastItem)[i] = last_item;
     }
-    peerLastItem[peers - 1] = n_data-1;
+    (*peerLastItem)[peers - 1] = n_data-1;
 
     /*** Check the partitioning correctness ***/
-    long sum = peerLastItem[0] + 1;
-    partitionSize[0] = peerLastItem[0] + 1;
+    long sum = (*peerLastItem)[0] + 1;
+    (*partitionSize)[0] = (*peerLastItem)[0] + 1;
     //cerr << "peer 0:" << sum << "\n";
     for(int i = 1; i < peers; i++) {
-        sum += peerLastItem[i] - peerLastItem[i-1];
-        partitionSize[i] = peerLastItem[i] - peerLastItem[i-1];
-        //cerr << "peer " << i << ":" << peerLastItem[i] - peerLastItem[i-1] << "\n";
+        sum += (*peerLastItem)[i] - (*peerLastItem)[i-1];
+        (*partitionSize)[i] = (*peerLastItem)[i] - (*peerLastItem)[i-1];
+        //cerr << "peer " << i << ":" << (*peerLastItem)[i] - (*peerLastItem)[i-1] << "\n";
     }
 
     if(sum != n_data) {
@@ -1758,7 +1737,7 @@ void printUsedParameters(Params params) {
          << "percentage subspaces = " << params.percentageSubspaces  << endl
          << "k_max = " << params.k_max  << endl
          << "local convergence tolerance = "<< params.convThreshold  << endl
-         << "number of consecutive rounds in which a peer must locally converge = "<< params.convLimit
+         << "number of consecutive rounds in which a peer must locally converge = "<< params.convLimit << endl
          << "peers = " << params.peers  << endl
          << "fan-out = " << params.fanOut << endl
          << "graph type = ";
@@ -1986,7 +1965,7 @@ double computeBCSS(double *pts_incluster, mat centroids, double *c_mean) {
     return bcss;
 }
 
-double computeLocalWCSS(long partitionSize, cluster_report rep, double **subspace) {
+double computeLocalWCweight(long partitionSize, cluster_report rep, double **subspace) {
     if (!subspace || !(rep.cidx) || rep.centroids.is_empty()) {
         exit(NullPointerError(__FUNCTION__));
     }
