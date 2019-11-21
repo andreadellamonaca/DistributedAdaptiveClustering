@@ -473,7 +473,9 @@ int main(int argc, char **argv) {
 
     /***    Principal Component Analysis on CORR set
      * 1) Locally each peer computes the covariance matrix on its dataset
-     *      partition of CORR set and saves the result in "covar".
+     *      partition of CORR set and saves the result in "covar". Moreover
+     *      each peer computes the number of elements for the denominator of
+     *      covariance matrix and it stores the value in "tot_num_data".
      * 2) An average consensus on the covariance matrix is executed.
      * 3) Locally each peer computes eigenvalues/eigenvectors (with Armadillo
      *      functions), get the 2 Principal Components and store them in "combine".
@@ -495,22 +497,37 @@ int main(int argc, char **argv) {
         programStatus = MemoryError(__FUNCTION__);
         goto ON_EXIT;
     }
+    tot_num_data = (double *) calloc(params.peers, sizeof(double));
+    if (!tot_num_data) {
+        programStatus = MemoryError(__FUNCTION__);
+        goto ON_EXIT;
+    }
     for (int i = 0; i < params.peers * corr_vars[0]; ++i) {
         covar_i[i] = &covar_storage[i * corr_vars[0]];
     }
     for (int i = 0; i < params.peers; ++i) {
         covar[i] = &covar_i[i * corr_vars[0]];
+        tot_num_data[i] = partitionSize[i];
     }
 
+    dimestimate = SingleValueAverageConsensus(params, graph, tot_num_data);
     for(int peerID = 0; peerID < params.peers; peerID++){
+        tot_num_data[peerID] = std::round(tot_num_data[peerID] / (double) dimestimate[peerID]);
         programStatus = computeLocalCovarianceMatrix(partitionSize[peerID], corr_vars[peerID],
-                                                     corr[peerID], covar[peerID]);
+                                                 corr[peerID], covar[peerID]);
         if (programStatus) {
             goto ON_EXIT;
         }
     }
 
-    UDiagMatrixAverageConsensus(params, graph, corr_vars, covar);
+    dimestimate = UDiagMatrixAverageConsensus(params, graph, corr_vars, covar);
+    for(int peerID = 0; peerID < params.peers; peerID++){
+        for (int i = 0; i < corr_vars[0]; ++i) {
+            for (int j = 0; j < corr_vars[0]; ++j) {
+                covar[peerID][i][j] = covar[peerID][i][j] / (dimestimate[peerID] * tot_num_data[peerID]);
+            }
+        }
+    }
 
     combine = (double ***) malloc(params.peers * sizeof(double **));
     if (!combine) {
@@ -642,10 +659,15 @@ int main(int argc, char **argv) {
             goto ON_EXIT;
         }
         fill_n(num_dims, params.peers, 3);
-        UDiagMatrixAverageConsensus(params, graph, num_dims, covar);
+        dimestimate = UDiagMatrixAverageConsensus(params, graph, num_dims, covar);
         free(num_dims), num_dims = nullptr;
 
         for(int peerID = 0; peerID < params.peers; peerID++) {
+            for (int i = 0; i < 3; ++i) {
+                for (int j = 0; j < 3; ++j) {
+                    covar[peerID][i][j] = covar[peerID][i][j] / (dimestimate[peerID] * tot_num_data[peerID]);
+                }
+            }
             programStatus = computePCA(covar[peerID], combine[peerID], partitionSize[peerID], 3,
                                        subspace[peerID][subspaceID]);
             if (programStatus) {
@@ -1080,23 +1102,10 @@ int main(int argc, char **argv) {
     }
 
     /***    Final result broadcast to all the peers
-     * Each peer sets "tot_num_data" to its partition size and then all the peers
-     * estimate the total number of data with an average consensus on the sum of "tot_num_data".
      * Each peer fills "global_outliers" with the local information, then the global solution is
      * reached with an average consensus on the sum of each element in "global_outliers".
      * Finally peer 0 is queried to get the final result.
     ***/
-    tot_num_data = (double *) calloc(params.peers, sizeof(double));
-    if (!tot_num_data) {
-        programStatus = MemoryError(__FUNCTION__);
-        goto ON_EXIT;
-    }
-    for(int peerID = 0; peerID < params.peers; peerID++){
-        tot_num_data[peerID] = partitionSize[peerID];
-    }
-
-    dimestimate = SingleValueAverageConsensus(params, graph, tot_num_data);
-
     global_outliers = (double **) malloc(params.peers * sizeof(double *));
     if (!global_outliers) {
         programStatus = MemoryError(__FUNCTION__);
@@ -1104,8 +1113,6 @@ int main(int argc, char **argv) {
     }
 
     for (int peerID = 0; peerID < params.peers; peerID++) {
-        tot_num_data[peerID] = std::round(tot_num_data[peerID] / (double) dimestimate[peerID]);
-
         global_outliers[peerID] = (double *) calloc(tot_num_data[peerID], sizeof(double));
         if (!global_outliers[peerID]) {
             programStatus = MemoryError(__FUNCTION__);
@@ -1218,6 +1225,15 @@ int main(int argc, char **argv) {
         }
         free(combine), combine = nullptr;
     }
+    if(final != nullptr)
+        for (int i = 0; i < uncorr_vars[0]; ++i) {
+            for (int j = 0; j < params.peers; ++j) {
+                free(final[i][j].cidx), final[i][j].cidx = nullptr;
+            }
+        }
+        free(final), final = nullptr;
+    if(final_i != nullptr)
+        free(final_i), final_i = nullptr;
     if(uncorr_vars != nullptr) {
         if(subspace != nullptr) {
             for(int i = 0; i < params.peers; i++){
@@ -1247,10 +1263,6 @@ int main(int argc, char **argv) {
         }
         free(uncorr_vars), uncorr_vars = nullptr;
     }
-    if(final_i != nullptr)
-        free(final_i), final_i = nullptr;
-    if(final != nullptr)
-        free(final), final = nullptr;
     if(prev != nullptr)
         free(prev), prev = nullptr;
     if(localsum != nullptr)
@@ -1308,7 +1320,7 @@ int main(int argc, char **argv) {
     return programStatus;
 }
 
-void StartTheClock(){
+void StartTheClock() {
     t1 = chrono::high_resolution_clock::now();
 }
 

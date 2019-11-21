@@ -232,9 +232,6 @@ int computeLocalCovarianceMatrix(long partitionSize, int covarMatrixDim, double 
             for (int k = 0; k < partitionSize; ++k) {
                 covarianceMatrix[i][j] += space[i][k] * space[j][k];
             }
-            if (partitionSize != 0) {
-                covarianceMatrix[i][j] = covarianceMatrix[i][j] / partitionSize;
-            }
         }
     }
     return 0;
