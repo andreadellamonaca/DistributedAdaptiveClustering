@@ -56,7 +56,7 @@ igraph_t generateErdosRenyiGraph(igraph_integer_t n, igraph_erdos_renyi_t type, 
  */
 igraph_t generateRegularGraph(igraph_integer_t n, igraph_integer_t k);
 /**
- * This function generate the selected random graph
+ * This function generates the selected random graph
  *
  * @param [in] type - The type of the random graph: 1 geometric, 2 Barabasi-Albert, 3 Erdos-Renyi, 4 regular (clique)
  * @param [in] n - The number of nodes in the generated graph
@@ -70,7 +70,7 @@ igraph_t generateRandomGraph(int type, int n);
  */
 void printGraphType(int type);
 /**
- * This function print on terminal tha minimum and maximum vertex degree
+ * This function prints on terminal tha minimum and maximum vertex degree
  * @param graph the graph structure (from igraph).
  * @param outputOnFile a boolean value for print purpose.
  * @return an igraph_vector_t structure (from igraph) containing the requested informations.

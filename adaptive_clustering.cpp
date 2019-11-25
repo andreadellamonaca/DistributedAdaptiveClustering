@@ -5,24 +5,27 @@ int getDatasetDims(string fname, int &dim, int &data) {
     dim = 0;
     data = 0;
     ifstream file(fname);
-    while (file) {
-        string s;
-        if (!getline(file, s)) break;
-        if (data == 0) {
-            istringstream ss(s);
-            while (ss) {
+    
+    string s;
+    if(file.is_open()){
+        
+        while (getline(file, s)) {
+           
+            if (data == 0) {
+                istringstream ss(s);
                 string line;
-                if (!getline(ss, line, ','))
-                    break;
-                dim++;
+                while (getline(ss, line, ',')) {
+                    dim++;
+                }
             }
+            
+            data++;
         }
-        data++;
-    }
 
-    if (!file.eof()) {
-        file.close();
-        return InputFileError(__FUNCTION__);
+    }
+    else {
+        cerr << "the file " << fname << " is not open!" << endl;
+         return InputFileError(__FUNCTION__);
     }
 
     cout << "Dataset: #DATA = " << data << " , #DIMENSIONS = " << dim << endl;
@@ -34,49 +37,61 @@ int loadData(string fname, double **array, int n_dims) {
     if (!array) {
         return NullPointerError(__FUNCTION__);
     }
+    
     ifstream inputFile(fname);
     int row = 0;
-    while (inputFile) {
-        string s;
-        if (!getline(inputFile, s)) break;
-        if (s[0] != '#') {
-            istringstream ss(s);
-            while (ss) {
-                for (int i = 0; i < n_dims; i++) {
-                    string line;
-                    if (!getline(ss, line, ','))
-                        break;
+    
+    string s;
+    if(inputFile.is_open()){
+        
+        while (getline(inputFile, s)) {
+            
+             if (s[0] != '#') {
+                 
+                 istringstream ss(s);
+                 
+                 for (int i = 0; i < n_dims; i++) {
+                     string line;
+                     getline(ss, line, ',');
+                        
                     try {
                         array[row][i] = stod(line);
-                    } catch (const invalid_argument e) {
-                        cout << "NaN found in file " << fname << " line " << row
-                             << endl;
+                    }
+                    catch (const invalid_argument e) {
+                        cout << "NaN found in file " << fname << " line " << row << endl;
                         inputFile.close();
                         return ConversionError(__FUNCTION__);
                     }
                 }
-            }
-        }
-        row++;
+        
+             }
+            
+             row++;
+         }
+        
+         inputFile.close();
+        
     }
-    if (!inputFile.eof()) {
-        inputFile.close();
+    else{
         return InputFileError(__FUNCTION__);
     }
-    inputFile.close();
+   
     return 0;
+    
 }
 
 int cluster_size(cluster_report rep, int cluster_id, int n_data) {
     if (!rep.cidx) {
         exit(NullPointerError(__FUNCTION__));
     }
+    
     int occurrence = 0;
     for (int i = 0; i < n_data; ++i) {
         if (rep.cidx[i] == cluster_id) {
             occurrence++;
         }
     }
+    
     return occurrence;
 }
 
@@ -84,8 +99,10 @@ int mindistCluster(mat centroids, double first_coordinate, double second_coordin
     if (centroids.is_empty()) {
         exit(NullPointerError(__FUNCTION__));
     }
+    
     double min_dist = L2distance(centroids.at(0,0), centroids.at(1,0), first_coordinate, second_coordinate);
     int index = 0;
+    
     for (int j = 1; j < centroids.n_cols; ++j) {
         double new_dist = L2distance(centroids.at(0,j), centroids.at(1,j), first_coordinate, second_coordinate);
         if (new_dist < min_dist) {
@@ -93,6 +110,7 @@ int mindistCluster(mat centroids, double first_coordinate, double second_coordin
             index = j;
         }
     }
+    
     return index;
 }
 
@@ -100,13 +118,16 @@ int create_cidx_matrix(double **data, int partitionSize, cluster_report &instanc
     if (!data || instance.centroids.is_empty()) {
         return NullPointerError(__FUNCTION__);
     }
+    
     instance.cidx = (int *) calloc(partitionSize, sizeof(int));
     if (!instance.cidx) {
         return MemoryError(__FUNCTION__);
     }
+    
     for (int i = 0; i < partitionSize; ++i) {
         instance.cidx[i] = mindistCluster(instance.centroids, data[0][i], data[1][i]);
     }
+    
     return 0;
 }
 
@@ -131,11 +152,13 @@ int computeLocalAverage(double **data, int ndims, long start, long end, double *
     if ((end-start)) {
         weight = 1 / (double) (end-start);
     }
+    
     for (int i = start; i <= end; ++i) {
         for (int j = 0; j < ndims; ++j) {
             summaries[j] += weight * data[i][j];
         }
     }
+    
     return 0;
 }
 
@@ -149,6 +172,7 @@ int CenterData(double *summaries, int ndims, long start, long end, double **data
             data[i][j] -= summaries[j];
         }
     }
+    
     return 0;
 }
 
@@ -166,6 +190,7 @@ int computeLocalPCC(double **pcc, double *squaresum_dims, int ndims, long start,
             }
         }
     }
+    
     return 0;
 }
 
@@ -180,6 +205,7 @@ int computePearsonMatrix(double **pcc, double *squaresum_dims, int ndims) {
             pcc[m][l] = pcc[l][m];
         }
     }
+    
     return 0;
 }
 
@@ -193,6 +219,7 @@ bool isCorrDimension(int ndims, int dimensionID, double **pcc) {
             overall += pcc[dimensionID][secondDimension];
         }
     }
+    
     return ( (overall / ndims) >= 0 );
 }
 
@@ -206,7 +233,9 @@ int computeCorrUncorrCardinality(double **pcc, int ndims, int &corr_vars, int &u
             corr_vars++;
         }
     }
+    
     uncorr_vars = ndims - corr_vars;
+    
     return 0;
 }
 
@@ -214,11 +243,13 @@ int copyDimension(double **data, int dimOut, int dimIn, long start, long end, do
     if (!data || !newstorage) {
         return NullPointerError(__FUNCTION__);
     }
+    
     int elem = 0;
     for (int k = start; k <= end; ++k) {
         newstorage[dimOut][elem] = data[k][dimIn];
         elem++;
     }
+    
     return 0;
 }
 
@@ -226,14 +257,19 @@ int computeLocalCovarianceMatrix(long partitionSize, int covarMatrixDim, double 
     if (!space || !covarianceMatrix) {
         return NullPointerError(__FUNCTION__);
     }
+    
     for (int i = 0; i < covarMatrixDim; ++i) {
         for (int j = i; j < covarMatrixDim; ++j) {
             covarianceMatrix[i][j] = 0;
             for (int k = 0; k < partitionSize; ++k) {
                 covarianceMatrix[i][j] += space[i][k] * space[j][k];
             }
+            if (partitionSize != 0) {
+                covarianceMatrix[i][j] = covarianceMatrix[i][j] / partitionSize;
+            }
         }
     }
+    
     return 0;
 }
 
@@ -241,6 +277,7 @@ int computePCA(double **covarianceMatrix, double **oldSpace, long partitionSize,
     if (!covarianceMatrix || !oldSpace || !newSpace) {
         return NullPointerError(__FUNCTION__);
     }
+    
     mat cov_mat(covarianceMatrix[0], n_dims, n_dims);
     vec eigval;
     mat eigvec;
@@ -256,6 +293,7 @@ int computePCA(double **covarianceMatrix, double **oldSpace, long partitionSize,
             newSpace[i][j] = value;
         }
     }
+    
     return 0;
 }
 
@@ -269,6 +307,7 @@ int computeLocalKMeans(long partitionSize, mat centroids, double **subspace, dou
         localsum[0][l] += centroids(0, l);
         localsum[1][l] += centroids(1, l);
     }
+    
     for (int k = 0; k < partitionSize; ++k) {
         int clusterid = mindistCluster(centroids, subspace[0][k], subspace[1][k]);
 
@@ -277,6 +316,7 @@ int computeLocalKMeans(long partitionSize, mat centroids, double **subspace, dou
         localsum[1][clusterid] += subspace[1][k];
         error += pow(L2distance(centroids(0, clusterid), centroids(1, clusterid), subspace[0][k], subspace[1][k]), 2);
     }
+    
     return 0;
 }
 
@@ -289,11 +329,13 @@ int computeLocalC_Mean(double **data, long partitionSize, double *summaries) {
     if (partitionSize) {
         weight = 1 / (double) partitionSize;
     }
+    
     for (int k = 0; k < partitionSize; ++k) {
         for (int l = 0; l < 2; ++l) {
             summaries[l] += weight * data[l][k];
         }
     }
+    
     return 0;
 }
 
@@ -305,6 +347,7 @@ int computeLocalPtsIncluster(long partitionSize, double *pts_incluster, cluster_
     for (int k = 0; k < partitionSize; ++k) {
         pts_incluster[rep.cidx[k]]++;
     }
+    
     return 0;
 }
 
@@ -322,8 +365,10 @@ int computeNin_Nout(int nCluster, double *pts_incluster, double &Nin, double &No
             }
         }
     }
+    
     Nin = nin / 2;
     Nout = nout / 2;
+    
     return 0;
 }
 
@@ -336,6 +381,7 @@ double computeBCSS(double *pts_incluster, mat centroids, double *c_mean) {
     for (int m = 0; m < centroids.n_cols; ++m) {
         bcss += (pts_incluster[m] * L2distance(centroids(0, m), centroids(1, m), c_mean[0], c_mean[1]));
     }
+    
     return bcss;
 }
 
@@ -352,6 +398,7 @@ double computeLocalWCweight(long partitionSize, cluster_report rep, double **sub
             }
         }
     }
+    
     return wcss;
 }
 
@@ -366,6 +413,7 @@ double computeLocalClusterDistance(long partitionSize, cluster_report rep, int c
             dist += L2distance(rep.centroids(0, clusterid), rep.centroids(1, clusterid), subspace[0][k], subspace[1][k]);
         }
     }
+    
     return dist;
 }
 
@@ -380,6 +428,7 @@ int computeLocalClusterDimension(long partitionSize, cluster_report rep, int clu
             count++;
         }
     }
+    
     return count;
 }
 
@@ -398,6 +447,7 @@ int computeLocalInliers(long partitionSize, cluster_report rep, int clusterid, b
             }
         }
     }
+    
     return count;
 }
 
@@ -413,13 +463,10 @@ int getCountOutliersinSubspace(int uncorr_vars, long partitionSize, int start_id
             }
         }
     }
+    
     return 0;
 }
 
-
-/**
- * Extra function to save centroids and candidate subspace in CSV files. NOT USED!
- */
 void data_out(double ****data, long *lastitem, string name, bool ***incircle, int peers, int cs, cluster_report *report) {
     fstream fout;
     fout.open("../../plot/" + name, ios::out | ios::trunc);

@@ -11,23 +11,12 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="424560db-08e6-4a5b-8aff-21bd96c75824" name="Default Changelist" comment="Added Doxygen comments.">
+    <list default="true" id="424560db-08e6-4a5b-8aff-21bd96c75824" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/adaptive_clustering.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/alglib/alglibinternal.cpp.o" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/alglib/alglibmisc.cpp.o" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/alglib/ap.cpp.o" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/alglib/dataanalysis.cpp.o" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/alglib/linalg.cpp.o" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/alglib/optimization.cpp.o" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/alglib/solvers.cpp.o" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/alglib/specialfunctions.cpp.o" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/alglib/statistics.cpp.o" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/error.cpp.o" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/graph.cpp.o" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/adaptive_clustering.h" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/graph.h" beforeDir="false" afterPath="$PROJECT_DIR$/graph.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/main.cpp" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -53,9 +42,9 @@
   </component>
   <component name="PropertiesComponent">
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/main2.cpp" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../p2pAdaptiveClustering-modified/adaptive_clustering.h" />
     <property name="nodejs_package_manager_path" value="npm" />
-    <property name="two.files.diff.last.used.file" value="$PROJECT_DIR$/main2.cpp" />
+    <property name="two.files.diff.last.used.file" value="$PROJECT_DIR$/../p2pAdaptiveClustering-modified/adaptive_clustering.h" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
@@ -190,7 +179,9 @@
       <workItem from="1574267103269" duration="372000" />
       <workItem from="1574330170247" duration="1853000" />
       <workItem from="1574334399458" duration="3546000" />
-      <workItem from="1574350927847" duration="2859000" />
+      <workItem from="1574350927847" duration="3113000" />
+      <workItem from="1574675037047" duration="2326000" />
+      <workItem from="1574677861280" duration="2019000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -444,7 +435,14 @@
       <option name="project" value="LOCAL" />
       <updated>1574266307321</updated>
     </task>
-    <option name="localTasksCounter" value="37" />
+    <task id="LOCAL-00037" summary="Optimized Covariance Matrix computation.">
+      <created>1574353993216</created>
+      <option name="number" value="00037" />
+      <option name="presentableId" value="LOCAL-00037" />
+      <option name="project" value="LOCAL" />
+      <updated>1574353993216</updated>
+    </task>
+    <option name="localTasksCounter" value="38" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -467,7 +465,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Added distributed Pearson Matrix computation." />
     <MESSAGE value="Added CORR-UNCORR partitioning. TBM" />
     <MESSAGE value="Applied Pca on CORR. TBM" />
     <MESSAGE value="Applied Pca on CORR.&#10;TODO: create candidate subspaces" />
@@ -492,6 +489,7 @@
     <MESSAGE value="Added Doxygen comments and some errors status." />
     <MESSAGE value="Added Doxygen comments and code optimization.&#10;TODO: Divide covariance and pearson functions" />
     <MESSAGE value="Added Doxygen comments." />
-    <option name="LAST_COMMIT_MESSAGE" value="Added Doxygen comments." />
+    <MESSAGE value="Optimized Covariance Matrix computation." />
+    <option name="LAST_COMMIT_MESSAGE" value="Optimized Covariance Matrix computation." />
   </component>
 </project>
