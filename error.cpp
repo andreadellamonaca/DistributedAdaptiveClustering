@@ -20,7 +20,7 @@ int NoUncorrVariablesError(string nameFunction) {
     return -4;
 }
 
-int ArgumentsError(string nameFunction) {
+int ArgumentError(string nameFunction) {
     cerr << nameFunction << ": Command Line Argument Error" << endl;
     return -5;
 }

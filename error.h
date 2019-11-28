@@ -32,7 +32,7 @@ int NoUncorrVariablesError(string nameFunction);
  * @param [in] nameFunction - Name of the calling function
  * @return -5
  */
-int ArgumentsError(string nameFunction);
+int ArgumentError(string nameFunction);
 /**
  * @param [in] nameFunction - Name of the calling function
  * @return -6

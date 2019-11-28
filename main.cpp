@@ -15,9 +15,9 @@
  * A structure containing parameters read from command-line.
  */
 struct Params {
-    int          peers = 100; /**< The number of peers. */
+    int          peers = 10; /**< The number of peers. */
     string       inputFilename = "../datasets/HTRU_2.csv"; /**< The path for the input CSV file. */
-    string       outputFilename; /**< The path for the output file. */
+    string       outputFilename = "../../Validation/Distributed.csv"; /**< The path for the output file. */
     double       convThreshold = 0.001; /**< The local convergence tolerance for the consensus algorithm. */
     int          convLimit = 3; /**< The number of consecutive rounds in which a peer must locally converge. */
     int          graphType = 2; /**< The graph distribution: 1 Geometric, 2 Barabasi-Albert, 3 Erdos-Renyi,
@@ -135,6 +135,7 @@ double* LocalSumAverageConsensus(Params params, igraph_t graph, int nCluster, do
  *          of peers (to be used for estimation of the sum of the value in structure).
  */
 double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure);
+int data_out(double *outliersCount, double n_data, int n_subspaces, Params params);
 
 int main(int argc, char **argv) {
 
@@ -1203,19 +1204,21 @@ int main(int argc, char **argv) {
     }
 
     //data_out(subspace, peerLastItem, "iris.csv", discardedPts, params.peers, uncorr_vars[0], final[0]);
+    if (!outputOnFile) {
+        cout << endl << "OUTLIERS:" << endl;
+        for (int dataID = 0; dataID < tot_num_data[0]; ++dataID) {
+            if (global_outliers[0][dataID] >= std::round(uncorr_vars[0] * params.percentageSubspaces)) {
+                cout << dataID << ") ";
+                for (int l = 0; l < n_dims; ++l) {
+                    cout << data[dataID][l] << " ";
+                }
 
-    cout << endl << "OUTLIERS:" << endl;
-    for (int dataID = 0; dataID < tot_num_data[0]; ++dataID) {
-        if (global_outliers[0][dataID] >= std::round(uncorr_vars[0] * params.percentageSubspaces)) {
-            cout << dataID << ") ";
-            for (int l = 0; l < n_dims; ++l) {
-                cout << data[dataID][l] << " ";
+                cout << "(" << global_outliers[0][dataID] << ")" << endl;
+
             }
-            
-            cout << "(" << global_outliers[0][dataID] << ")" << endl;
-            
         }
     }
+    data_out(global_outliers[0], tot_num_data[0], uncorr_vars[0], params);
 
     elapsed = StopTheClock();
     if (!outputOnFile) {
@@ -1413,96 +1416,96 @@ int parseCommandLine(char **argv, int argc, Params &params) {
             i++;
             if (i >= argc) {
                 cerr << "Missing number of peers parameter." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.peers = stoi(argv[i]);
         } else if (strcmp(argv[i], "-f") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing fan-out parameter." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.fanOut = stol(argv[i]);
         } else if (strcmp(argv[i], "-d") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing graph type parameter." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.graphType = stoi(argv[i]);
         } else if (strcmp(argv[i], "-ct") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing convergence tolerance parameter." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.convThreshold = stod(argv[i]);
         } else if (strcmp(argv[i], "-cl") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing # of consecutive rounds in which convergence is satisfied parameter." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.convLimit = stol(argv[i]);
         } else if (strcmp(argv[i], "-of") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing filename for simulation output." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.outputFilename = string(argv[i]);
         } else if (strcmp(argv[i], "-r") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing number of rounds to execute." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.roundsToExecute = stoi(argv[i]);
         } else if (strcmp(argv[i], "-k") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing max number of clusters for Elbow method." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.k_max = stol(argv[i]);
         } else if (strcmp(argv[i], "-et") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing threshold for Elbow method." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.convClusteringThreshold = stof(argv[i]);
         } else if (strcmp(argv[i], "-clst") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing threshold for distributed clustering." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.elbowThreshold = stof(argv[i]);
         } else if (strcmp(argv[i], "-pi") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing number of percentage of inlier points." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.percentageIncircle = stof(argv[i]);
         } else if (strcmp(argv[i], "-ps") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing number of percentage of subspace in which an outlier must be." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.percentageSubspaces = stof(argv[i]);
         } else if (strcmp(argv[i], "-if") == 0) {
             i++;
             if (i >= argc) {
                 cerr << "Missing input file name." << endl;
-                return ArgumentsError(__FUNCTION__);
+                return ArgumentError(__FUNCTION__);
             }
             params.inputFilename = string(argv[i]);
         } else {
             usage(argv[0]);
-            return ArgumentsError(__FUNCTION__);
+            return ArgumentError(__FUNCTION__);
         }
     }
     return 0;
@@ -1514,11 +1517,11 @@ void usage(char* cmd)
             << "Usage: " << cmd << "\n"
             << "-p          number of peers" << endl
             << "-f          fan-out of peers" << endl
-            << "-s          seed" << endl
             << "-d          graph type: 1 geometric 2 Barabasi-Albert 3 Erdos-Renyi 4 regular" << endl
             << "-ct         convergence tolerance" << endl
             << "-cl         number of consecutive rounds in which convergence must be satisfied" << endl
             << "-of         output filename, if specified a file with this name containing all of the peers stats is written" << endl
+            << "-r          max number of rounds to execute in consensus algorithm" << endl
             << "-k          max number of clusters to try in elbow criterion" << endl
             << "-et         threshold for the selection of optimal number of clusters in Elbow method" << endl
             << "-clst       the local convergence tolerance for distributed K-Means" << endl
@@ -1662,7 +1665,7 @@ double* SingleValueAverageConsensus(Params params, igraph_t graph, double* struc
             igraph_vector_init(&neighbors, 0);
             igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
             long neighborsSize = igraph_vector_size(&neighbors);
-            if(params.fanOut < neighborsSize){
+            if(params.fanOut < neighborsSize && params.fanOut != -1){
                 // randomly sample f adjacent vertices
                 igraph_vector_shuffle(&neighbors);
                 igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
@@ -1780,7 +1783,7 @@ double* VectorAverageConsensus(Params params, igraph_t graph, int dim, double** 
             igraph_vector_init(&neighbors, 0);
             igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
             long neighborsSize = igraph_vector_size(&neighbors);
-            if(params.fanOut < neighborsSize){
+            if(params.fanOut < neighborsSize && params.fanOut != -1){
                 // randomly sample f adjacent vertices
                 igraph_vector_shuffle(&neighbors);
                 igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
@@ -1898,7 +1901,7 @@ double* UDiagMatrixAverageConsensus(Params params, igraph_t graph, int *dim, dou
             igraph_vector_init(&neighbors, 0);
             igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
             long neighborsSize = igraph_vector_size(&neighbors);
-            if(params.fanOut < neighborsSize){
+            if(params.fanOut < neighborsSize && params.fanOut != -1){
                 // randomly sample f adjacent vertices
                 igraph_vector_shuffle(&neighbors);
                 igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
@@ -2022,7 +2025,7 @@ double* LocalSumAverageConsensus(Params params, igraph_t graph, int nCluster, do
             igraph_vector_init(&neighbors, 0);
             igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
             long neighborsSize = igraph_vector_size(&neighbors);
-            if(params.fanOut < neighborsSize){
+            if(params.fanOut < neighborsSize && params.fanOut != -1){
                 // randomly sample f adjacent vertices
                 igraph_vector_shuffle(&neighbors);
                 igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
@@ -2147,7 +2150,7 @@ double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure
             igraph_vector_init(&neighbors, 0);
             igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
             long neighborsSize = igraph_vector_size(&neighbors);
-            if(params.fanOut < neighborsSize){
+            if(params.fanOut < neighborsSize && params.fanOut != -1){
                 // randomly sample f adjacent vertices
                 igraph_vector_shuffle(&neighbors);
                 igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
@@ -2208,4 +2211,21 @@ double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure
         free(prevestimate), prevestimate = NULL;
 
     return dimestimate;
+}
+
+int data_out(double *outliersCount, double n_data, int n_subspaces, Params params) {
+    if (!outliersCount) {
+        return NullPointerError(__FUNCTION__);
+    }
+
+    fstream fout;
+    fout.open(params.outputFilename, ios::out | ios::trunc);
+
+    for (int dataID = 0; dataID < std::round(n_data); ++dataID) {
+        if (outliersCount[dataID] >= std::round(n_subspaces * params.percentageSubspaces)) {
+            fout << dataID << ",";
+        }
+    }
+    fout.close();
+    return 0;
 }

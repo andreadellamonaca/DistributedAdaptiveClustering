@@ -302,8 +302,3 @@ int computeLocalInliers(long partitionSize, cluster_report rep, int clusterid, b
  * @return 0 if it is correct, -2 if discarded or outliers are NULL.
  */
 int getCountOutliersinSubspace(int uncorr_vars, long partitionSize, int start_idx, bool **discarded, double *outliers);
-
-/**
- * Extra function to save centroids and candidate subspace in CSV files. NOT USED!
- */
-extern void data_out(double ****data, long *lastitem, string name, bool ***incircle, int peers, int cs, cluster_report *report);
