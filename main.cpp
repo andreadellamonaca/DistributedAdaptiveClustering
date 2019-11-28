@@ -16,7 +16,7 @@
  */
 struct Params {
     int          peers = 10; /**< The number of peers. */
-    string       inputFilename = "../datasets/HTRU_2.csv"; /**< The path for the input CSV file. */
+    string       inputFilename = "../datasets/Iris.csv"; /**< The path for the input CSV file. */
     string       outputFilename = "../../Validation/Distributed.csv"; /**< The path for the output file. */
     double       convThreshold = 0.001; /**< The local convergence tolerance for the consensus algorithm. */
     int          convLimit = 3; /**< The number of consecutive rounds in which a peer must locally converge. */
