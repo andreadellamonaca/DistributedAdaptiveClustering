@@ -100,11 +100,11 @@ int mindistCluster(mat centroids, double first_coordinate, double second_coordin
         exit(NullPointerError(__FUNCTION__));
     }
     
-    double min_dist = L2distance(centroids.at(0,0), centroids.at(1,0), first_coordinate, second_coordinate);
+    double min_dist = L2distance(centroids(0,0), centroids(1,0), first_coordinate, second_coordinate);
     int index = 0;
     
     for (int j = 1; j < centroids.n_cols; ++j) {
-        double new_dist = L2distance(centroids.at(0,j), centroids.at(1,j), first_coordinate, second_coordinate);
+        double new_dist = L2distance(centroids(0,j), centroids(1,j), first_coordinate, second_coordinate);
         if (new_dist < min_dist) {
             min_dist = new_dist;
             index = j;
