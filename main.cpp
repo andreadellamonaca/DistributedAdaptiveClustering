@@ -15,9 +15,9 @@
  * A structure containing parameters read from command-line.
  */
 struct Params {
-    int          peers = 10; /**< The number of peers. */
+    int          peers = 500; /**< The number of peers. */
     string       inputFilename = "../datasets/HTRU_2.csv"; /**< The path for the input CSV file. */
-    string       outputFilename = "../../Validation/HTRU_2Distributed.csv"; /**< The path for the output file. */
+    string       outputFilename; /**< The path for the output file. */
     double       convThreshold = 0.001; /**< The local convergence tolerance for the consensus algorithm. */
     int          convLimit = 3; /**< The number of consecutive rounds in which a peer must locally converge. */
     int          graphType = 2; /**< The graph distribution: 1 Geometric, 2 Barabasi-Albert, 3 Erdos-Renyi,
@@ -58,6 +58,18 @@ int parseCommandLine(char **argv, int argc, Params &params);
  * @param [in] cmd The name of the application.
  */
 void usage(char* cmd);
+/**
+ * This function partitions the data between the peers and it generates 2 vectors:
+ * peerLastItem has the index of last item for each peer, while partitionSize has
+ * the count of elements that each peer manages.
+ * @param [in] n_data the number of data to partition.
+ * @param [in] peers the number of peers.
+ * @param [in,out] peerLastItem a long array [1, peers]
+ * @param [in,out] partitionSize a long array [1, peers]
+ * @return 0 if it is correct, -1 for memory allocation error on peerLastItem or
+ *          partitionSize, otherwise -7.
+ */
+int partitionData(int n_data, int peers, long **peerLastItem, long **partitionSize);
 /**
  * This function prints the parameters used for the run.
  * @param [in] params the structure holding the parameters.
@@ -135,7 +147,17 @@ double* LocalSumAverageConsensus(Params params, igraph_t graph, int nCluster, do
  *          of peers (to be used for estimation of the sum of the value in structure).
  */
 double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure);
-int data_out(double *outliersCount, double n_data, int n_subspaces, Params params);
+/**
+ *
+ * @param [in] params the structure containing the parameters for consensus.
+ * @param [in] graph an igraph_vector_t structure (from igraph).
+ * @param [in] structure a structure of dimension [peers, peers] containing the
+ *                          information to be exchanged.
+ * @return an array [1, peers] containing the estimate for each peer of the total number
+ *          of peers (to be used for estimation of the sum of the value in structure).
+ */
+double* OutliersConsensus(Params params, igraph_t graph, vector<vector<int>> *structure);
+int data_out(vector<vector<int>> &outliersCount, int n_subspaces, Params params);
 
 int main(int argc, char **argv) {
 
@@ -187,8 +209,9 @@ int main(int argc, char **argv) {
 
     //Structures used for outlier identification
     double *inliers = NULL, *prev_inliers = NULL, *cluster_dim = NULL, *actual_dist = NULL,
-            *actual_cluster_dim = NULL, *tot_num_data = NULL, **global_outliers = NULL;
+            *actual_cluster_dim = NULL;
     bool ***discardedPts = NULL;
+    vector< vector<int> > *outliers = NULL;
 
     /*** Dataset Loading ***/
     programStatus = getDatasetDims(params.inputFilename, n_dims, n_data);
@@ -893,7 +916,7 @@ int main(int argc, char **argv) {
              * the number of distinct intra-cluster (N_in) and inter-cluster (N_out) edges
              * to compute BetaCV.  For N_in and N_out, the peers get the number of elements
              * in each cluster with an average consensus on the sum of "pts_incluster".
-             * For BC, the peers get the mean of all the points  with an average consensus 
+             * For BC, the peers get the mean of all the points  with an average consensus
              * on "c_mean". Locally all the peers compute N_in, N_out, BC and the local estimate
              * of WC; then the general WC is reached with an average consensus on the sum of WC.
              * After that each peer computes the BetaCV metric locally and evaluates
@@ -1158,69 +1181,45 @@ int main(int argc, char **argv) {
      * reached with an average consensus on the sum of each element in "global_outliers".
      * Finally peer 0 is queried to get the final result.
     ***/
-    tot_num_data = (double *) calloc(params.peers, sizeof(double));
-    if (!tot_num_data) {
-        programStatus = MemoryError(__FUNCTION__);
-        goto ON_EXIT;
-    }
-
-    for(int peerID = 0; peerID < params.peers; peerID++){
-        tot_num_data[peerID] = partitionSize[peerID];
-    }
-
-    dimestimate = SingleValueAverageConsensus(params, graph, tot_num_data);
-
-    global_outliers = (double **) malloc(params.peers * sizeof(double *));
-    if (!global_outliers) {
+    outliers = new (nothrow) vector< vector<int> >[params.peers];
+    if (!outliers) {
         programStatus = MemoryError(__FUNCTION__);
         goto ON_EXIT;
     }
 
     for (int peerID = 0; peerID < params.peers; peerID++) {
-        tot_num_data[peerID] = std::round(tot_num_data[peerID] / (double) dimestimate[peerID]);
+        outliers[peerID].resize(params.peers);
 
-        global_outliers[peerID] = (double *) calloc(tot_num_data[peerID], sizeof(double));
-        if (!global_outliers[peerID]) {
-            programStatus = MemoryError(__FUNCTION__);
-            goto ON_EXIT;
-        }
-
-        if (peerID == 0) {
-            programStatus = getCountOutliersinSubspace(uncorr_vars[peerID], partitionSize[peerID], 0, discardedPts[peerID], global_outliers[peerID]);
-        } else {
-            int index = peerLastItem[peerID - 1] + 1;
-            programStatus = getCountOutliersinSubspace(uncorr_vars[peerID], partitionSize[peerID], index, discardedPts[peerID], global_outliers[peerID]);
-        }
+        programStatus = getCountOutliersinSubspace(uncorr_vars[peerID], partitionSize[peerID], discardedPts[peerID],
+                                                   outliers[peerID][peerID]);
 
         if (programStatus) {
             goto ON_EXIT;
         }
     }
 
-    dimestimate = VectorAverageConsensus(params, graph, tot_num_data[0], global_outliers);
-
-    for (int peerID = 0; peerID < params.peers; peerID++) {
-        for (int dataID = 0; dataID < tot_num_data[peerID]; ++dataID) {
-            global_outliers[peerID][dataID] = std::round(global_outliers[peerID][dataID] / dimestimate[peerID]);
-        }
-    }
+    dimestimate = OutliersConsensus(params, graph, outliers);
 
     //data_out(subspace, peerLastItem, "iris.csv", discardedPts, params.peers, uncorr_vars[0], final[0]);
     if (!outputOnFile) {
         cout << endl << "OUTLIERS:" << endl;
-        for (int dataID = 0; dataID < tot_num_data[0]; ++dataID) {
-            if (global_outliers[0][dataID] >= std::round(uncorr_vars[0] * params.percentageSubspaces)) {
-                cout << dataID << ") ";
-                for (int l = 0; l < n_dims; ++l) {
-                    cout << data[dataID][l] << " ";
+        int index = 0;
+        for (int peerID = 0; peerID < params.peers; peerID++) {
+            for (int dataID = 0; dataID < outliers[0][peerID].size(); ++dataID) {
+                if (outliers[0][peerID][dataID] >= std::round(uncorr_vars[0] * params.percentageSubspaces)) {
+                    cout << index + dataID << " (" << outliers[0][peerID][dataID] << "), ";
                 }
-
-                cout << "(" << global_outliers[0][dataID] << ")" << endl;
-
             }
+            index += outliers[0][peerID].size();
+            cout << endl;
+        }
+        cout << endl << "CENTROIDS:" << endl;
+        for (int subspaceID = 0; subspaceID < uncorr_vars[0]; ++subspaceID) {
+            final[subspaceID][0].centroids.print();
+            cout << endl;
         }
     }
-    data_out(global_outliers[0], tot_num_data[0], uncorr_vars[0], params);
+    data_out(outliers[0], uncorr_vars[0], params);
 
     elapsed = StopTheClock();
     if (!outputOnFile) {
@@ -1385,15 +1384,8 @@ int main(int argc, char **argv) {
         free(actual_dist), actual_dist = NULL;
     if(actual_cluster_dim != NULL)
         free(actual_cluster_dim), actual_cluster_dim = NULL;
-    if(tot_num_data != NULL)
-        free(tot_num_data), tot_num_data = NULL;
-    if(global_outliers != NULL) {
-        for(int i = 0; i < params.peers; i++){
-            if(global_outliers[i] != NULL)
-                free(global_outliers[i]), global_outliers[i] = NULL;
-        }
-
-        free(global_outliers), global_outliers = NULL;
+    if(outliers != NULL) {
+        delete[] outliers, outliers = NULL;
     }
 
     if(dimestimate != NULL)
@@ -2215,18 +2207,141 @@ double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure
     return dimestimate;
 }
 
-int data_out(double *outliersCount, double n_data, int n_subspaces, Params params) {
-    if (!outliersCount) {
+double* OutliersConsensus(Params params, igraph_t graph, vector<vector<int>> *structure) {
+    if (!structure) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+
+    double *dimestimate = NULL, *prevestimate = NULL;
+    bool *converged = NULL;
+    int *convRounds = NULL;
+    int Numberofconverged = params.peers;
+    int rounds = 0;
+    int status = 0;
+
+    dimestimate = (double *) calloc(params.peers, sizeof(double));
+    if (!dimestimate) {
+        exit(MemoryError(__FUNCTION__));
+    }
+
+    dimestimate[0] = 1;
+
+    converged = (bool *) calloc(params.peers, sizeof(bool));
+    if (!converged) {
+        MemoryError(__FUNCTION__);
+        goto ON_EXIT;
+    }
+
+    fill_n(converged, params.peers, false);
+
+    convRounds = (int *) calloc(params.peers, sizeof(int));
+    if (!convRounds) {
+        MemoryError(__FUNCTION__);
+        goto ON_EXIT;
+    }
+
+    prevestimate = (double *) calloc(params.peers, sizeof(double));
+    if (!prevestimate) {
+        MemoryError(__FUNCTION__);
+        goto ON_EXIT;
+    }
+
+    while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
+        memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
+        for(int peerID = 0; peerID < params.peers; peerID++){
+            // check peer convergence
+            if(params.roundsToExecute < 0 && converged[peerID])
+                continue;
+            // determine peer neighbors
+            igraph_vector_t neighbors;
+            igraph_vector_init(&neighbors, 0);
+            igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
+            long neighborsSize = igraph_vector_size(&neighbors);
+            if(params.fanOut < neighborsSize && params.fanOut != -1){
+                // randomly sample f adjacent vertices
+                igraph_vector_shuffle(&neighbors);
+                igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
+            }
+
+            neighborsSize = igraph_vector_size(&neighbors);
+            for(int i = 0; i < neighborsSize; i++){
+                int neighborID = (int) VECTOR(neighbors)[i];
+                igraph_integer_t edgeID;
+                igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
+
+                for (int k = 0; k < params.peers; ++k) {
+                    if (structure[peerID][k].empty()) {
+                        structure[peerID][k] = structure[neighborID][k];
+                    }
+                    structure[neighborID][k] = structure[peerID][k];
+                }
+
+                computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
+                dimestimate[neighborID] = dimestimate[peerID];
+            }
+
+            igraph_vector_destroy(&neighbors);
+        }
+
+        // check local convergence
+        if (params.roundsToExecute < 0) {
+            for(int peerID = 0; peerID < params.peers; peerID++){
+                if(converged[peerID])
+                    continue;
+
+                bool dimestimateconv;
+                if(prevestimate[peerID])
+                    dimestimateconv = fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) < params.convThreshold;
+                else
+                    dimestimateconv = false;
+
+                if(dimestimateconv)
+                    convRounds[peerID]++;
+                else
+                    convRounds[peerID] = 0;
+
+                converged[peerID] = (convRounds[peerID] >= params.convLimit);
+                if(converged[peerID]){
+                    Numberofconverged --;
+                }
+            }
+        }
+
+        rounds++;
+        //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
+        params.roundsToExecute--;
+    }
+
+    ON_EXIT:
+
+    if (converged != NULL)
+        free(converged), converged = NULL;
+
+    if (convRounds != NULL)
+        free(convRounds), convRounds = NULL;
+
+    if (prevestimate != NULL)
+        free(prevestimate), prevestimate = NULL;
+
+    return dimestimate;
+}
+
+int data_out(vector<vector<int>> &outliersCount, int n_subspaces, Params params) {
+    if (outliersCount.empty()) {
         return NullPointerError(__FUNCTION__);
     }
 
     fstream fout;
     fout.open(params.outputFilename, ios::out | ios::trunc);
 
-    for (int dataID = 0; dataID < std::round(n_data); ++dataID) {
-        if (outliersCount[dataID] >= std::round(n_subspaces * params.percentageSubspaces)) {
-            fout << dataID << ",";
+    int index = 0;
+    for (int peerID = 0; peerID < params.peers; peerID++) {
+        for (int dataID = 0; dataID < outliersCount[peerID].size(); ++dataID) {
+            if (outliersCount[peerID][dataID] >= std::round(n_subspaces * params.percentageSubspaces)) {
+                fout << index + dataID << ",";
+            }
         }
+        index += outliersCount[peerID].size();
     }
     fout.close();
     return 0;

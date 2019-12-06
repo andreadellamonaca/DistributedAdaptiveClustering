@@ -451,17 +451,20 @@ int computeLocalInliers(long partitionSize, cluster_report rep, int clusterid, b
     return count;
 }
 
-int getCountOutliersinSubspace(int uncorr_vars, long partitionSize, int start_idx, bool **discarded, double *outliers) {
-    if (!discarded || !(outliers)) {
+int getCountOutliersinSubspace(int uncorr_vars, long partitionSize, bool **discarded, vector<int> &outliers) {
+    if (!discarded) {
         return NullPointerError(__FUNCTION__);
     }
+    outliers.clear();
 
     for (int k = 0; k < partitionSize; ++k) {
+        int count = 0;
         for (int j = 0; j < uncorr_vars; ++j) {
             if (!discarded[j][k]) {
-                outliers[start_idx+k]++;
+                count++;
             }
         }
+        outliers.push_back(count);
     }
     
     return 0;
