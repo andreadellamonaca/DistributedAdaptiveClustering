@@ -76,6 +76,18 @@ extern int create_cidx_matrix(double **data, int partitionSize, cluster_report &
  */
 extern double L2distance(double xc, double yc, double x1, double y1);
 /**
+ * This function partitions the data between the peers and it generates 2 vectors:
+ * peerLastItem has the index of last item for each peer, while partitionSize has
+ * the count of elements that each peer manages.
+ * @param [in] n_data the number of data to partition.
+ * @param [in] peers the number of peers.
+ * @param [in,out] peerLastItem a long array [1, peers]
+ * @param [in,out] partitionSize a long array [1, peers]
+ * @return 0 if it is correct, -1 for memory allocation error on peerLastItem or
+ *          partitionSize, otherwise -7.
+ */
+int partitionData(int n_data, int peers, long **peerLastItem, long **partitionSize);
+/**
  * This function computes the average on each dimension for a single peer.
  * @param [in] data a matrix [n_data, n_dims] containing the dataset.
  * @param [in] ndims the number of dimensions.
@@ -284,9 +296,8 @@ int computeLocalInliers(long partitionSize, cluster_report rep, int clusterid, b
  * is considered as outlier in all the subspaces.
  * @param [in] uncorr_vars the number of dimensions in UNCORR.
  * @param [in] partitionSize the number of elements managed by the peer.
- * @param [in] start_idx the index, a value between 0 and n_data, of the first element of the peer.
  * @param [in] discarded a matrix [uncorr_vars, partitionSize] indicating if a point was discarded.
- * @param [in,out] outliers an array [1,n_data] storing the number of times each point is an outlier in all the subspaces.
+ * @param [in,out] outliers a structure [peers] storing the number of times each point is an outlier in all the subspaces.
  * @return 0 if it is correct, -2 if discarded or outliers are NULL.
  */
 int getCountOutliersinSubspace(int uncorr_vars, long partitionSize, bool **discarded, vector<int> &outliers);

@@ -15,8 +15,8 @@
  * A structure containing parameters read from command-line.
  */
 struct Params {
-    int          peers = 500; /**< The number of peers. */
-    string       inputFilename = "../datasets/HTRU_2.csv"; /**< The path for the input CSV file. */
+    int          peers = 100; /**< The number of peers. */
+    string       inputFilename = "../datasets/Absenteeism_at_work.csv"; /**< The path for the input CSV file. */
     string       outputFilename; /**< The path for the output file. */
     double       convThreshold = 0.001; /**< The local convergence tolerance for the consensus algorithm. */
     int          convLimit = 3; /**< The number of consecutive rounds in which a peer must locally converge. */
@@ -58,18 +58,6 @@ int parseCommandLine(char **argv, int argc, Params &params);
  * @param [in] cmd The name of the application.
  */
 void usage(char* cmd);
-/**
- * This function partitions the data between the peers and it generates 2 vectors:
- * peerLastItem has the index of last item for each peer, while partitionSize has
- * the count of elements that each peer manages.
- * @param [in] n_data the number of data to partition.
- * @param [in] peers the number of peers.
- * @param [in,out] peerLastItem a long array [1, peers]
- * @param [in,out] partitionSize a long array [1, peers]
- * @return 0 if it is correct, -1 for memory allocation error on peerLastItem or
- *          partitionSize, otherwise -7.
- */
-int partitionData(int n_data, int peers, long **peerLastItem, long **partitionSize);
 /**
  * This function prints the parameters used for the run.
  * @param [in] params the structure holding the parameters.
@@ -148,7 +136,8 @@ double* LocalSumAverageConsensus(Params params, igraph_t graph, int nCluster, do
  */
 double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure);
 /**
- *
+ * This function merges the outliers count for all the peers. This function exits with
+ * code -2 if structure is NULL and -1 for error in memory allocation.
  * @param [in] params the structure containing the parameters for consensus.
  * @param [in] graph an igraph_vector_t structure (from igraph).
  * @param [in] structure a structure of dimension [peers, peers] containing the
@@ -157,7 +146,14 @@ double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure
  *          of peers (to be used for estimation of the sum of the value in structure).
  */
 double* OutliersConsensus(Params params, igraph_t graph, vector<vector<int>> *structure);
-int data_out(vector<vector<int>> &outliersCount, int n_subspaces, Params params);
+/**
+ * This function writes the Outliers count of a single peer into the given CSV file.
+ * @param [in] outliersCount a structure of dimension [peers, peers] containing the outliers information.
+ * @param [in] n_subspaces the number of cnadidate subspaces.
+ * @param [in] params the structure containing the parameters.
+ * @return 0 if it is correct, -2 if outliersCount is empty.
+ */
+int writeOutliersOnCSV(vector<vector<int>> &outliersCount, int n_subspaces, Params params);
 
 int main(int argc, char **argv) {
 
@@ -439,6 +435,7 @@ int main(int argc, char **argv) {
         programStatus = MemoryError(__FUNCTION__);
         goto ON_EXIT;
     }
+    //memset(uncorr, NULL, params.peers * sizeof(int *));
 
     corr = (double ***) malloc(params.peers * sizeof(double **));
     if (!corr) {
@@ -777,7 +774,7 @@ int main(int argc, char **argv) {
 
         for (int nCluster = 1; nCluster <= params.k_max; ++nCluster) {
             cube centroids(2, nCluster, params.peers, fill::zeros);
-            // Peer 0 set random centroids
+            //Peer 0 sets random centroids
             centroids.slice(0) = randu<mat>(2, nCluster);
             // Broadcast random centroids
             dimestimate = CentroidsAverageConsensus(params, graph, centroids);
@@ -1175,11 +1172,8 @@ int main(int argc, char **argv) {
     }
 
     /***    Final result broadcast to all the peers
-     * Each peer sets "tot_num_data" to its partition size and then all the peers
-     * estimate the total number of data with an average consensus on the sum of "tot_num_data".
-     * Each peer fills "global_outliers" with the local information, then the global solution is
-     * reached with an average consensus on the sum of each element in "global_outliers".
-     * Finally peer 0 is queried to get the final result.
+     * Each peer stores its outliers count in "outliers", then the global solution is merged
+     * with a consensus on "outliers". Finally peer 0 is queried to get the final result.
     ***/
     outliers = new (nothrow) vector< vector<int> >[params.peers];
     if (!outliers) {
@@ -1200,7 +1194,6 @@ int main(int argc, char **argv) {
 
     dimestimate = OutliersConsensus(params, graph, outliers);
 
-    //data_out(subspace, peerLastItem, "iris.csv", discardedPts, params.peers, uncorr_vars[0], final[0]);
     if (!outputOnFile) {
         cout << endl << "OUTLIERS:" << endl;
         int index = 0;
@@ -1219,7 +1212,7 @@ int main(int argc, char **argv) {
             cout << endl;
         }
     }
-    data_out(outliers[0], uncorr_vars[0], params);
+    writeOutliersOnCSV(outliers[0], uncorr_vars[0], params);
 
     elapsed = StopTheClock();
     if (!outputOnFile) {
@@ -1387,7 +1380,6 @@ int main(int argc, char **argv) {
     if(outliers != NULL) {
         delete[] outliers, outliers = NULL;
     }
-
     if(dimestimate != NULL)
         free(dimestimate), dimestimate = NULL;
 
@@ -1522,49 +1514,6 @@ void usage(char* cmd)
             << "-pi         percentage of points in a cluster to be evaluated as inlier" << endl
             << "-ps         percentage of subspaces in which a point must be outlier to be evaluated as general outlier" << endl
             << "-if         input filename" << endl << endl;
-}
-
-int partitionData(int n_data, int peers, long **peerLastItem, long **partitionSize) {
-
-    *peerLastItem = (long *) calloc(peers, sizeof(long));
-    if (!(*peerLastItem)) {
-        return MemoryError(__FUNCTION__);
-    }
-    *partitionSize = (long *) calloc(peers, sizeof(long));
-    if (!(*partitionSize)) {
-        free(*peerLastItem), *peerLastItem = NULL;
-        return MemoryError(__FUNCTION__);
-    }
-    std::random_device rd; // obtain a random number from hardware
-    std::mt19937 eng(rd()); // seed the generator
-    std::uniform_real_distribution<> distr(-1, 1); // define the range
-
-    for(int i = 0; i < peers - 1; i++){
-        float rnd = distr(eng);
-        //cerr << "rnd: " << rnd << "\n";
-        long last_item = rnd * ((float)n_data/(float)peers) * 0.1 + (float) (i+1) * ((float)n_data/(float)peers) - 1;
-        (*peerLastItem)[i] = last_item;
-    }
-
-    (*peerLastItem)[peers - 1] = n_data-1;
-
-    /*** Check the partitioning correctness ***/
-    long sum = (*peerLastItem)[0] + 1;
-    (*partitionSize)[0] = (*peerLastItem)[0] + 1;
-    //cerr << "peer 0:" << sum << "\n";
-
-    for(int i = 1; i < peers; i++) {
-        sum += (*peerLastItem)[i] - (*peerLastItem)[i-1];
-        (*partitionSize)[i] = (*peerLastItem)[i] - (*peerLastItem)[i-1];
-        //cerr << "peer " << i << ":" << (*peerLastItem)[i] - (*peerLastItem)[i-1] << "\n";
-    }
-
-    if(sum != n_data) {
-        cout << "ERROR: n_data = " << n_data << "!= sum = " << sum << endl;
-        return PartitioningDatasetError(__FUNCTION__);
-    }
-
-    return 0;
 }
 
 void printUsedParameters(Params params) {
@@ -2326,7 +2275,7 @@ double* OutliersConsensus(Params params, igraph_t graph, vector<vector<int>> *st
     return dimestimate;
 }
 
-int data_out(vector<vector<int>> &outliersCount, int n_subspaces, Params params) {
+int writeOutliersOnCSV(vector<vector<int>> &outliersCount, int n_subspaces, Params params) {
     if (outliersCount.empty()) {
         return NullPointerError(__FUNCTION__);
     }

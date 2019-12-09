@@ -142,6 +142,48 @@ double L2distance(double xc, double yc, double x1, double y1) {
     return dist;
 }
 
+int partitionData(int n_data, int peers, long **peerLastItem, long **partitionSize) {
+
+    *peerLastItem = (long *) calloc(peers, sizeof(long));
+    if (!(*peerLastItem)) {
+        return MemoryError(__FUNCTION__);
+    }
+    *partitionSize = (long *) calloc(peers, sizeof(long));
+    if (!(*partitionSize)) {
+        free(*peerLastItem), *peerLastItem = NULL;
+        return MemoryError(__FUNCTION__);
+    }
+    std::random_device rd; // obtain a random number from hardware
+    std::mt19937 eng(rd()); // seed the generator
+    std::uniform_real_distribution<> distr(-1, 1); // define the range
+
+    for(int i = 0; i < peers - 1; i++){
+        float rnd = distr(eng);
+        //cerr << "rnd: " << rnd << "\n";
+        long last_item = rnd * ((float)n_data/(float)peers) * 0.1 + (float) (i+1) * ((float)n_data/(float)peers) - 1;
+        (*peerLastItem)[i] = last_item;
+    }
+
+    (*peerLastItem)[peers - 1] = n_data-1;
+
+    /*** Check the partitioning correctness ***/
+    long sum = (*peerLastItem)[0] + 1;
+    (*partitionSize)[0] = (*peerLastItem)[0] + 1;
+    //cerr << "peer 0:" << sum << "\n";
+
+    for(int i = 1; i < peers; i++) {
+        sum += (*peerLastItem)[i] - (*peerLastItem)[i-1];
+        (*partitionSize)[i] = (*peerLastItem)[i] - (*peerLastItem)[i-1];
+        //cerr << "peer " << i << ":" << (*peerLastItem)[i] - (*peerLastItem)[i-1] << "\n";
+    }
+
+    if(sum != n_data) {
+        cout << "ERROR: n_data = " << n_data << "!= sum = " << sum << endl;
+        return PartitioningDatasetError(__FUNCTION__);
+    }
+
+    return 0;
+}
 
 int computeLocalAverage(double **data, int ndims, long start, long end, double *summaries) {
     if (!data || !summaries) {
@@ -466,42 +508,6 @@ int getCountOutliersinSubspace(int uncorr_vars, long partitionSize, bool **disca
         }
         outliers.push_back(count);
     }
-    
+
     return 0;
-}
-
-void data_out(double ****data, long *lastitem, string name, bool ***incircle, int peers, int cs, cluster_report *report) {
-    fstream fout;
-    fout.open("../../plot/" + name, ios::out | ios::trunc);
-
-    for (int k = 0; k < cs; ++k) {
-        for (int peerid = 0; peerid < peers; ++peerid) {
-            int pts_count = 0;
-            if (peerid == 0) {
-                pts_count = lastitem[0] + 1;
-            } else {
-                pts_count = lastitem[peerid] - lastitem[peerid-1];
-            }
-            for (int i = 0; i < pts_count; ++i) {
-                for (int j = 0; j < 2; ++j) {
-                    fout << data[peerid][k][j][i] << ",";
-                }
-                if (incircle[peerid][k][i]) {
-                    fout << "1,";
-                } else {
-                    fout << "0,";
-                }
-                fout << report[peerid].cidx[i];
-                fout << "\n";
-            }
-        }
-    }
-    fout.close();
-    fstream fout2;
-    fout2.open("../../plot/centroids_" + name, ios::out | ios::trunc);
-    for (int i = 0; i < report[0].k; ++i) {
-        fout2 << report[0].centroids.at(0, i) << ",";
-        fout2 << report[0].centroids.at(1, i) << "\n";
-    }
-    fout2.close();
 }
