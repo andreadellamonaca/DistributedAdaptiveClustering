@@ -191,8 +191,8 @@ int computeLocalAverage(double **data, int ndims, long start, long end, double *
     }
 
     double weight = 0;
-    if ((end-start)) {
-        weight = 1 / (double) (end-start);
+    if ((end - start)) {
+        weight = 1 / (double) (end - start + 1);
     }
     
     for (int i = start; i <= end; ++i) {
@@ -336,7 +336,7 @@ int computePCA(double **covarianceMatrix, double **oldSpace, long partitionSize,
             newSpace[i][j] = value;
         }
     }
-    
+
     return 0;
 }
 

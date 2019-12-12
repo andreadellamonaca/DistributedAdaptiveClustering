@@ -15,7 +15,7 @@
  * A structure containing parameters read from command-line.
  */
 struct Params {
-    int          peers = 1; /**< The number of peers. */
+    int          peers = 100; /**< The number of peers. */
     string       inputFilename = "../datasets/Iris.csv"; /**< The path for the input CSV file. */
     string       outputFilename; /**< The path for the output file. */
     double       convThreshold = 0.001; /**< The local convergence tolerance for the consensus algorithm. */
@@ -430,14 +430,13 @@ int main(int argc, char **argv) {
         goto ON_EXIT;
     }
 
-    uncorr = (int **) malloc(params.peers * sizeof(int *));
+    uncorr = (int **) calloc(params.peers, sizeof(int *));
     if (!uncorr) {
         programStatus = MemoryError(__FUNCTION__);
         goto ON_EXIT;
     }
-    //memset(uncorr, NULL, params.peers * sizeof(int *));
 
-    corr = (double ***) malloc(params.peers * sizeof(double **));
+    corr = (double ***) calloc(params.peers, sizeof(double **));
     if (!corr) {
         programStatus = MemoryError(__FUNCTION__);
         goto ON_EXIT;
@@ -449,21 +448,7 @@ int main(int argc, char **argv) {
             goto ON_EXIT;
         }
 
-        if (peerID == 0) {
-            cout << "Correlated dimensions: " << corr_vars[peerID] << ", " << "Uncorrelated dimensions: " << uncorr_vars[peerID] << endl;
-
-            if (corr_vars[peerID] < 2) {
-                programStatus = LessCorrVariablesError(__FUNCTION__);
-                goto ON_EXIT;
-            }
-
-            if (uncorr_vars[peerID] == 0) {
-                programStatus = NoUncorrVariablesError(__FUNCTION__);
-                goto ON_EXIT;
-            }
-        }
-
-        corr[peerID] = (double **) malloc(corr_vars[peerID] * sizeof(double *));
+        corr[peerID] = (double **) calloc(corr_vars[peerID], sizeof(double *));
         if (!corr[peerID]) {
             programStatus = MemoryError(__FUNCTION__);
             goto ON_EXIT;
@@ -481,6 +466,20 @@ int main(int argc, char **argv) {
         if (!uncorr[peerID]) {
             programStatus = MemoryError(__FUNCTION__);
             goto ON_EXIT;
+        }
+
+        if (peerID == 0) {
+            cout << "Correlated dimensions: " << corr_vars[peerID] << ", " << "Uncorrelated dimensions: " << uncorr_vars[peerID] << endl;
+
+            if (corr_vars[peerID] < 2) {
+                programStatus = LessCorrVariablesError(__FUNCTION__);
+                goto ON_EXIT;
+            }
+
+            if (uncorr_vars[peerID] == 0) {
+                programStatus = NoUncorrVariablesError(__FUNCTION__);
+                goto ON_EXIT;
+            }
         }
 
         corr_vars[peerID] = 0, uncorr_vars[peerID] = 0;
@@ -560,14 +559,14 @@ int main(int argc, char **argv) {
 
     UDiagMatrixAverageConsensus(params, graph, corr_vars, covar);
 
-    combine = (double ***) malloc(params.peers * sizeof(double **));
+    combine = (double ***) calloc(params.peers, sizeof(double **));
     if (!combine) {
         programStatus = MemoryError(__FUNCTION__);
         goto ON_EXIT;
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
-        combine[peerID] = (double **) malloc(3 * sizeof(double *));
+        combine[peerID] = (double **) calloc(3, sizeof(double *));
         if (!combine[peerID]) {
             programStatus = MemoryError(__FUNCTION__);
             goto ON_EXIT;
@@ -617,21 +616,21 @@ int main(int argc, char **argv) {
     ***/
     StartTheClock();
 
-    subspace = (double ****) malloc(params.peers * sizeof(double ***));
+    subspace = (double ****) calloc(params.peers, sizeof(double ***));
     if (!subspace) {
         programStatus = MemoryError(__FUNCTION__);
         goto ON_EXIT;
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
-        subspace[peerID] = (double ***) malloc(uncorr_vars[peerID] * sizeof(double **));
+        subspace[peerID] = (double ***) calloc(uncorr_vars[peerID], sizeof(double **));
         if (!subspace[peerID]) {
             programStatus = MemoryError(__FUNCTION__);
             goto ON_EXIT;
         }
 
         for (int uncorrVarID = 0; uncorrVarID < uncorr_vars[peerID]; ++uncorrVarID) {
-            subspace[peerID][uncorrVarID] = (double **) malloc(2 * sizeof(double *));
+            subspace[peerID][uncorrVarID] = (double **) calloc(2, sizeof(double *));
             if (!subspace[peerID][uncorrVarID]) {
                 programStatus = MemoryError(__FUNCTION__);
                 goto ON_EXIT;
@@ -1060,14 +1059,14 @@ int main(int argc, char **argv) {
     ***/
     StartTheClock();
     // Structure to keep record of inliers for each peer (for Outlier identification)
-    discardedPts = (bool ***) malloc(params.peers * sizeof(bool **));
+    discardedPts = (bool ***) calloc(params.peers, sizeof(bool **));
     if (!discardedPts) {
         programStatus = MemoryError(__FUNCTION__);
         goto ON_EXIT;
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
-        discardedPts[peerID] = (bool **) malloc(uncorr_vars[peerID] * sizeof(bool *));
+        discardedPts[peerID] = (bool **) calloc(uncorr_vars[peerID], sizeof(bool *));
         if (!discardedPts[peerID]) {
             programStatus = MemoryError(__FUNCTION__);
             goto ON_EXIT;
