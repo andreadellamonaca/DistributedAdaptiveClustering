@@ -15,8 +15,8 @@
  * A structure containing parameters read from command-line.
  */
 struct Params {
-    int          peers = 100; /**< The number of peers. */
-    string       inputFilename = "../datasets/Absenteeism_at_work.csv"; /**< The path for the input CSV file. */
+    int          peers = 1; /**< The number of peers. */
+    string       inputFilename = "../datasets/Iris.csv"; /**< The path for the input CSV file. */
     string       outputFilename; /**< The path for the output file. */
     double       convThreshold = 0.001; /**< The local convergence tolerance for the consensus algorithm. */
     int          convLimit = 3; /**< The number of consecutive rounds in which a peer must locally converge. */
