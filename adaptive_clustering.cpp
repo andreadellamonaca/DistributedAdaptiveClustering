@@ -191,8 +191,8 @@ int computeLocalAverage(double **data, int ndims, long start, long end, double *
     }
 
     double weight = 0;
-    if ((end - start)) {
-        weight = 1 / (double) (end - start + 1);
+    if ((end-start)) {
+        weight = 1 / (double) (end-start+1);
     }
     
     for (int i = start; i <= end; ++i) {
@@ -334,6 +334,26 @@ int computePCA(double **covarianceMatrix, double **oldSpace, long partitionSize,
                 value += oldSpace[k][j] * eigvec(k, col);
             }
             newSpace[i][j] = value;
+        }
+    }
+
+    return 0;
+}
+
+int computeLocalInitialCentroid(int centroidToSet, int partitionSize, double **data, double &actual_dist, mat &centroids) {
+    if (!data || centroids.is_empty()) {
+        return NullPointerError(__FUNCTION__);
+    }
+
+    actual_dist = 1e12;
+    for (int dataID = 0; dataID < partitionSize; ++dataID) {
+        for (int centroidID = 0; centroidID < centroidToSet; ++centroidID) {
+            double dist = L2distance(centroids(0, centroidID), centroids(1, centroidID), data[0][dataID], data[1][dataID]);
+            if (dist < actual_dist) {
+                actual_dist = dist;
+                centroids(0, centroidToSet) = data[0][dataID];
+                centroids(1, centroidToSet) = data[1][dataID];
+            }
         }
     }
 

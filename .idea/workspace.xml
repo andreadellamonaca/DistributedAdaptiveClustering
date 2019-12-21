@@ -14,7 +14,7 @@
     <list default="true" id="424560db-08e6-4a5b-8aff-21bd96c75824" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/adaptive_clustering.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/adaptive_clustering.cpp.o" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/adaptive_clustering.h" beforeDir="false" afterPath="$PROJECT_DIR$/adaptive_clustering.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/DistributedAdaptiveClustering.dir/main.cpp.o" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/DistributedAdaptiveClustering" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/main.cpp" afterDir="false" />
@@ -26,6 +26,20 @@
   </component>
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="DatabaseView">
+    <option name="SHOW_INTERMEDIATE" value="true" />
+    <option name="GROUP_DATA_SOURCES" value="true" />
+    <option name="GROUP_SCHEMA" value="true" />
+    <option name="GROUP_CONTENTS" value="false" />
+    <option name="SORT_POSITIONED" value="false" />
+    <option name="SHOW_EMPTY_GROUPS" value="false" />
+    <option name="AUTO_SCROLL_FROM_SOURCE" value="false" />
+    <option name="HIDDEN_KINDS">
+      <set />
+    </option>
+    <expand />
+    <select />
   </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug" />
   <component name="FavoritesManager">
@@ -45,11 +59,12 @@
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent">
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/../Test/DistributedAdaptiveClustering/adaptive_clustering.cpp" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../p2p-adaptive-clustering/DistributedAdaptiveClustering/adaptive_clustering.cpp" />
     <property name="nodejs_package_manager_path" value="npm" />
-    <property name="two.files.diff.last.used.file" value="$PROJECT_DIR$/../Test/DistributedAdaptiveClustering/adaptive_clustering.cpp" />
-    <property name="two.files.diff.last.used.folder" value="$PROJECT_DIR$/../Test/DistributedAdaptiveClustering" />
+    <property name="two.files.diff.last.used.file" value="$PROJECT_DIR$/../p2p-adaptive-clustering/DistributedAdaptiveClustering/adaptive_clustering.cpp" />
+    <property name="two.files.diff.last.used.folder" value="$PROJECT_DIR$/../Finale/DistributedAdaptiveClustering" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
@@ -219,7 +234,16 @@
       <workItem from="1576149563595" duration="2183000" />
       <workItem from="1576166884361" duration="2316000" />
       <workItem from="1576174875566" duration="2601000" />
-      <workItem from="1576178909373" duration="1295000" />
+      <workItem from="1576178909373" duration="2389000" />
+      <workItem from="1576232226622" duration="2826000" />
+      <workItem from="1576325411150" duration="148000" />
+      <workItem from="1576411149302" duration="3474000" />
+      <workItem from="1576425785694" duration="288000" />
+      <workItem from="1576748980998" duration="140000" />
+      <workItem from="1576749179397" duration="492000" />
+      <workItem from="1576772038965" duration="732000" />
+      <workItem from="1576930549505" duration="1544000" />
+      <workItem from="1576941454138" duration="12374000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -529,7 +553,14 @@
       <option name="project" value="LOCAL" />
       <updated>1576167301465</updated>
     </task>
-    <option name="localTasksCounter" value="45" />
+    <task id="LOCAL-00045" summary="Corrections.">
+      <created>1576180384611</created>
+      <option name="number" value="00045" />
+      <option name="presentableId" value="LOCAL-00045" />
+      <option name="project" value="LOCAL" />
+      <updated>1576180384611</updated>
+    </task>
+    <option name="localTasksCounter" value="46" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -580,57 +611,57 @@
     <option name="LAST_COMMIT_MESSAGE" value="Corrections." />
   </component>
   <component name="WindowStateProjectService">
-    <state x="270" y="24" key="CommitChangelistDialog2" timestamp="1576167300406">
+    <state x="270" y="24" key="CommitChangelistDialog2" timestamp="1576180383318">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state x="270" y="24" key="CommitChangelistDialog2/59.24.1307.744@59.24.1307.744" timestamp="1576167300406" />
-    <state x="158" y="96" width="1109" height="573" maximized="true" key="DiffContextDialog" timestamp="1576180268517">
+    <state x="270" y="24" key="CommitChangelistDialog2/59.24.1307.744@59.24.1307.744" timestamp="1576180383318" />
+    <state x="158" y="96" width="1109" height="573" maximized="true" key="DiffContextDialog" timestamp="1576749529683">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state x="158" y="96" width="1109" height="573" maximized="true" key="DiffContextDialog/59.24.1307.744@59.24.1307.744" timestamp="1576180268517" />
-    <state x="499" y="141" width="424" height="482" key="FileChooserDialogImpl" timestamp="1576180267861">
+    <state x="158" y="96" width="1109" height="573" maximized="true" key="DiffContextDialog/59.24.1307.744@59.24.1307.744" timestamp="1576749529683" />
+    <state x="499" y="141" width="424" height="482" key="FileChooserDialogImpl" timestamp="1576749528880">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state x="499" y="141" width="424" height="482" key="FileChooserDialogImpl/59.24.1307.744@59.24.1307.744" timestamp="1576180267861" />
-    <state width="1261" height="184" key="GridCell.Tab.0.bottom" timestamp="1576180182266">
+    <state x="499" y="141" width="424" height="482" key="FileChooserDialogImpl/59.24.1307.744@59.24.1307.744" timestamp="1576749528880" />
+    <state width="1235" height="201" key="GridCell.Tab.0.bottom" timestamp="1576956283521">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1261" height="184" key="GridCell.Tab.0.bottom/59.24.1307.744@59.24.1307.744" timestamp="1576180182266" />
-    <state width="1261" height="184" key="GridCell.Tab.0.center" timestamp="1576180182265">
+    <state width="1235" height="201" key="GridCell.Tab.0.bottom/59.24.1307.744@59.24.1307.744" timestamp="1576956283521" />
+    <state width="1235" height="201" key="GridCell.Tab.0.center" timestamp="1576956283520">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1261" height="184" key="GridCell.Tab.0.center/59.24.1307.744@59.24.1307.744" timestamp="1576180182265" />
-    <state width="1261" height="184" key="GridCell.Tab.0.left" timestamp="1576180182265">
+    <state width="1235" height="201" key="GridCell.Tab.0.center/59.24.1307.744@59.24.1307.744" timestamp="1576956283520" />
+    <state width="1235" height="201" key="GridCell.Tab.0.left" timestamp="1576956283520">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1261" height="184" key="GridCell.Tab.0.left/59.24.1307.744@59.24.1307.744" timestamp="1576180182265" />
-    <state width="1261" height="184" key="GridCell.Tab.0.right" timestamp="1576180182266">
+    <state width="1235" height="201" key="GridCell.Tab.0.left/59.24.1307.744@59.24.1307.744" timestamp="1576956283520" />
+    <state width="1235" height="201" key="GridCell.Tab.0.right" timestamp="1576956283521">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1261" height="184" key="GridCell.Tab.0.right/59.24.1307.744@59.24.1307.744" timestamp="1576180182266" />
-    <state width="1261" height="184" key="GridCell.Tab.1.bottom" timestamp="1576180175396">
+    <state width="1235" height="201" key="GridCell.Tab.0.right/59.24.1307.744@59.24.1307.744" timestamp="1576956283521" />
+    <state width="1235" height="175" key="GridCell.Tab.1.bottom" timestamp="1576951975542">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1261" height="184" key="GridCell.Tab.1.bottom/59.24.1307.744@59.24.1307.744" timestamp="1576180175396" />
-    <state width="1261" height="184" key="GridCell.Tab.1.center" timestamp="1576180175395">
+    <state width="1235" height="175" key="GridCell.Tab.1.bottom/59.24.1307.744@59.24.1307.744" timestamp="1576951975542" />
+    <state width="1235" height="175" key="GridCell.Tab.1.center" timestamp="1576951975542">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1261" height="184" key="GridCell.Tab.1.center/59.24.1307.744@59.24.1307.744" timestamp="1576180175395" />
-    <state width="1261" height="184" key="GridCell.Tab.1.left" timestamp="1576180175395">
+    <state width="1235" height="175" key="GridCell.Tab.1.center/59.24.1307.744@59.24.1307.744" timestamp="1576951975542" />
+    <state width="1235" height="175" key="GridCell.Tab.1.left" timestamp="1576951975541">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1261" height="184" key="GridCell.Tab.1.left/59.24.1307.744@59.24.1307.744" timestamp="1576180175395" />
-    <state width="1261" height="184" key="GridCell.Tab.1.right" timestamp="1576180175395">
+    <state width="1235" height="175" key="GridCell.Tab.1.left/59.24.1307.744@59.24.1307.744" timestamp="1576951975541" />
+    <state width="1235" height="175" key="GridCell.Tab.1.right" timestamp="1576951975542">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1261" height="184" key="GridCell.Tab.1.right/59.24.1307.744@59.24.1307.744" timestamp="1576180175395" />
-    <state x="312" y="119" key="Vcs.Push.Dialog.v2" timestamp="1576167314972">
+    <state width="1235" height="175" key="GridCell.Tab.1.right/59.24.1307.744@59.24.1307.744" timestamp="1576951975542" />
+    <state x="312" y="119" key="Vcs.Push.Dialog.v2" timestamp="1576180394653">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state x="312" y="119" key="Vcs.Push.Dialog.v2/59.24.1307.744@59.24.1307.744" timestamp="1576167314972" />
-    <state x="462" y="34" width="501" height="702" key="refactoring.ChangeSignatureDialog" timestamp="1575734141816">
+    <state x="312" y="119" key="Vcs.Push.Dialog.v2/59.24.1307.744@59.24.1307.744" timestamp="1576180394653" />
+    <state x="462" y="34" width="501" height="702" key="refactoring.ChangeSignatureDialog" timestamp="1576955683320">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state x="462" y="34" width="501" height="702" key="refactoring.ChangeSignatureDialog/59.24.1307.744@59.24.1307.744" timestamp="1575734141816" />
+    <state x="462" y="34" width="501" height="702" key="refactoring.ChangeSignatureDialog/59.24.1307.744@59.24.1307.744" timestamp="1576955683320" />
   </component>
 </project>

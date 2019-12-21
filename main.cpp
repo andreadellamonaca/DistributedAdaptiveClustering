@@ -15,8 +15,8 @@
  * A structure containing parameters read from command-line.
  */
 struct Params {
-    int          peers = 100; /**< The number of peers. */
-    string       inputFilename = "../datasets/Iris.csv"; /**< The path for the input CSV file. */
+    int          peers = 10; /**< The number of peers. */
+    string       inputFilename = "../datasets/HTRU_2.csv"; /**< The path for the input CSV file. */
     string       outputFilename; /**< The path for the output file. */
     double       convThreshold = 0.001; /**< The local convergence tolerance for the consensus algorithm. */
     int          convLimit = 3; /**< The number of consecutive rounds in which a peer must locally converge. */
@@ -31,6 +31,7 @@ struct Params {
     double       percentageIncircle = 0.9; /**< The percentage of points in a cluster to be considered as inliers. */
     double       percentageSubspaces = 0.8; /**< The percentage of subspace in which a point must be outlier to be
  *                                              evaluated as general outlier. */
+    int          version = 1; /**< 0 for standard K-Means and 1 for K-Means++. */
 };
 
 chrono::high_resolution_clock::time_point t1, t2;
@@ -136,6 +137,19 @@ double* LocalSumAverageConsensus(Params params, igraph_t graph, int nCluster, do
  */
 double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure);
 /**
+ * This function computes the consensus on centroids owned by the peers according to the distance.
+ * This function exits with code -2 if structure is empty or dist_vect is NULL and -1 for error
+ * in memory allocation.
+ * @param [in] params the structure containing the parameters for consensus.
+ * @param [in] graph an igraph_vector_t structure (from igraph).
+ * @param [in] structure a cube structure (from Armadillo library) [peers, 2, nCluster]
+ *                          containing the information to be exchanged.
+ * @param [in] dist_vect a vector containing the distance to compare the centroids to exchange.
+ * @return an array [1, peers] containing the estimate for each peer of the total number
+ *          of peers (to be used for estimation of the sum of the value in structure).
+ */
+double* MaxDistCentroidConsensus(Params params, igraph_t graph, cube &structure, double *dist_vect);
+/**
  * This function merges the outliers count for all the peers. This function exits with
  * code -2 if structure is NULL and -1 for error in memory allocation.
  * @param [in] params the structure containing the parameters for consensus.
@@ -195,8 +209,8 @@ int main(int argc, char **argv) {
     int *uncorr_vars = NULL, *corr_vars = NULL, **uncorr = NULL;
 
     //Structures used for clustering
-    double *localsum_storage = NULL, **localsum_i = NULL, ***localsum = NULL, *weights_storage = NULL,
-            **weights = NULL, *prev_err = NULL, *error = NULL;
+    double *centroids_dist = NULL, *localsum_storage = NULL, **localsum_i = NULL, ***localsum = NULL,
+            *weights_storage = NULL, **weights = NULL, *prev_err = NULL, *error = NULL;
     cluster_report *final_i = NULL, **final = NULL, *prev = NULL;
 
     //Structures used for BetaCV
@@ -448,7 +462,21 @@ int main(int argc, char **argv) {
             goto ON_EXIT;
         }
 
-        corr[peerID] = (double **) calloc(corr_vars[peerID], sizeof(double *));
+        if (peerID == 0) {
+            cout << "Correlated dimensions: " << corr_vars[peerID] << ", " << "Uncorrelated dimensions: " << uncorr_vars[peerID] << endl;
+
+            if (corr_vars[peerID] < 2) {
+                programStatus = LessCorrVariablesError(__FUNCTION__);
+                goto ON_EXIT;
+            }
+
+            if (uncorr_vars[peerID] == 0) {
+                programStatus = NoUncorrVariablesError(__FUNCTION__);
+                goto ON_EXIT;
+            }
+        }
+
+        corr[peerID] = (double **) malloc(corr_vars[peerID] * sizeof(double *));
         if (!corr[peerID]) {
             programStatus = MemoryError(__FUNCTION__);
             goto ON_EXIT;
@@ -466,20 +494,6 @@ int main(int argc, char **argv) {
         if (!uncorr[peerID]) {
             programStatus = MemoryError(__FUNCTION__);
             goto ON_EXIT;
-        }
-
-        if (peerID == 0) {
-            cout << "Correlated dimensions: " << corr_vars[peerID] << ", " << "Uncorrelated dimensions: " << uncorr_vars[peerID] << endl;
-
-            if (corr_vars[peerID] < 2) {
-                programStatus = LessCorrVariablesError(__FUNCTION__);
-                goto ON_EXIT;
-            }
-
-            if (uncorr_vars[peerID] == 0) {
-                programStatus = NoUncorrVariablesError(__FUNCTION__);
-                goto ON_EXIT;
-            }
         }
 
         corr_vars[peerID] = 0, uncorr_vars[peerID] = 0;
@@ -559,14 +573,14 @@ int main(int argc, char **argv) {
 
     UDiagMatrixAverageConsensus(params, graph, corr_vars, covar);
 
-    combine = (double ***) calloc(params.peers, sizeof(double **));
+    combine = (double ***) malloc(params.peers * sizeof(double **));
     if (!combine) {
         programStatus = MemoryError(__FUNCTION__);
         goto ON_EXIT;
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
-        combine[peerID] = (double **) calloc(3, sizeof(double *));
+        combine[peerID] = (double **) malloc(3 * sizeof(double *));
         if (!combine[peerID]) {
             programStatus = MemoryError(__FUNCTION__);
             goto ON_EXIT;
@@ -616,21 +630,21 @@ int main(int argc, char **argv) {
     ***/
     StartTheClock();
 
-    subspace = (double ****) calloc(params.peers, sizeof(double ***));
+    subspace = (double ****) malloc(params.peers * sizeof(double ***));
     if (!subspace) {
         programStatus = MemoryError(__FUNCTION__);
         goto ON_EXIT;
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
-        subspace[peerID] = (double ***) calloc(uncorr_vars[peerID], sizeof(double **));
+        subspace[peerID] = (double ***) malloc(uncorr_vars[peerID] * sizeof(double **));
         if (!subspace[peerID]) {
             programStatus = MemoryError(__FUNCTION__);
             goto ON_EXIT;
         }
 
         for (int uncorrVarID = 0; uncorrVarID < uncorr_vars[peerID]; ++uncorrVarID) {
-            subspace[peerID][uncorrVarID] = (double **) calloc(2, sizeof(double *));
+            subspace[peerID][uncorrVarID] = (double **) malloc(2 * sizeof(double *));
             if (!subspace[peerID][uncorrVarID]) {
                 programStatus = MemoryError(__FUNCTION__);
                 goto ON_EXIT;
@@ -771,15 +785,63 @@ int main(int argc, char **argv) {
             goto ON_EXIT;
         }
 
+        centroids_dist = (double *) calloc(params.peers, sizeof(double));
+        if (!centroids_dist) {
+            programStatus = MemoryError(__FUNCTION__);
+            goto ON_EXIT;
+        }
+
         for (int nCluster = 1; nCluster <= params.k_max; ++nCluster) {
             cube centroids(2, nCluster, params.peers, fill::zeros);
-            //Peer 0 sets random centroids
-            centroids.slice(0) = randu<mat>(2, nCluster);
-            // Broadcast random centroids
-            dimestimate = CentroidsAverageConsensus(params, graph, centroids);
+            if (params.version) {
+                std::random_device rd; // obtain a random number from hardware
+                std::mt19937 eng(rd()); // seed the generator
+                std::uniform_int_distribution<> distr(0, n_data); // define the range
+                int first_centroid = distr(eng);
+                for(int peerID = 0; peerID < params.peers; peerID++) {
+                    if (peerID == 0) {
+                        if (first_centroid <= peerLastItem[peerID]) {
+                            centroids(0, 0, peerID) = subspace[peerID][subspaceID][0][first_centroid];
+                            centroids(1, 0, peerID) = subspace[peerID][subspaceID][1][first_centroid];
+                            break;
+                        }
+                    }
+                    else {
+                        if (first_centroid >= peerLastItem[peerID - 1] + 1 && first_centroid <= peerLastItem[peerID]) {
+                            int dataID = first_centroid - peerLastItem[peerID - 1] + 1;
+                            centroids(0, 0, peerID) = subspace[peerID][subspaceID][0][dataID];
+                            centroids(1, 0, peerID) = subspace[peerID][subspaceID][1][dataID];
+                            break;
+                        }
+                    }
+                }
+                // Broadcast first centroid
+                dimestimate = CentroidsAverageConsensus(params, graph, centroids);
 
-            for(int peerID = 0; peerID < params.peers; peerID++){
-                centroids.slice(peerID) = centroids.slice(peerID) / dimestimate[peerID];
+                for(int peerID = 0; peerID < params.peers; peerID++){
+                    centroids.slice(peerID) = centroids.slice(peerID) / dimestimate[peerID];
+                }
+
+                for (int centrToSet = 1; centrToSet < nCluster; ++centrToSet) {
+                    for(int peerID = 0; peerID < params.peers; peerID++) {
+                        programStatus = computeLocalInitialCentroid(centrToSet, partitionSize[peerID], subspace[peerID][subspaceID], centroids_dist[peerID], centroids.slice(peerID));
+
+                        if (programStatus) {
+                            goto ON_EXIT;
+                        }
+                    }
+                    MaxDistCentroidConsensus(params, graph, centroids, centroids_dist);
+                }
+            }
+            else {
+                //Peer 0 sets random centroids
+                centroids.slice(0) = randu<mat>(2, nCluster);
+                // Broadcast random centroids
+                dimestimate = CentroidsAverageConsensus(params, graph, centroids);
+
+                for(int peerID = 0; peerID < params.peers; peerID++){
+                    centroids.slice(peerID) = centroids.slice(peerID) / dimestimate[peerID];
+                }
             }
 
             localsum_storage = (double *) malloc(nCluster * 2 * params.peers * sizeof(double));
@@ -1033,6 +1095,7 @@ int main(int argc, char **argv) {
         }
 
         free(prev), prev = NULL;
+        free(centroids_dist), centroids_dist = NULL;
     }
 
     elapsed = StopTheClock();
@@ -1059,14 +1122,14 @@ int main(int argc, char **argv) {
     ***/
     StartTheClock();
     // Structure to keep record of inliers for each peer (for Outlier identification)
-    discardedPts = (bool ***) calloc(params.peers, sizeof(bool **));
+    discardedPts = (bool ***) malloc(params.peers * sizeof(bool **));
     if (!discardedPts) {
         programStatus = MemoryError(__FUNCTION__);
         goto ON_EXIT;
     }
 
     for(int peerID = 0; peerID < params.peers; peerID++) {
-        discardedPts[peerID] = (bool **) calloc(uncorr_vars[peerID], sizeof(bool *));
+        discardedPts[peerID] = (bool **) malloc(uncorr_vars[peerID] * sizeof(bool *));
         if (!discardedPts[peerID]) {
             programStatus = MemoryError(__FUNCTION__);
             goto ON_EXIT;
@@ -1203,7 +1266,6 @@ int main(int argc, char **argv) {
                 }
             }
             index += outliers[0][peerID].size();
-            cout << endl;
         }
         cout << endl << "CENTROIDS:" << endl;
         for (int subspaceID = 0; subspaceID < uncorr_vars[0]; ++subspaceID) {
@@ -1249,6 +1311,8 @@ int main(int argc, char **argv) {
         free(squaresum_dims_storage), squaresum_dims_storage = NULL;
     if(num_dims != NULL)
         free(num_dims), num_dims = NULL;
+
+
     if(uncorr != NULL) {
         for(int i = 0; i < params.peers; i++){
             if(uncorr[i] != NULL)
@@ -1263,7 +1327,7 @@ int main(int argc, char **argv) {
         if(corr != NULL)
             for(int i = 0; i < params.peers; i++){
                 for(int j = 0; j < corr_vars[i]; j++){
-                    if(corr[i][j] != NULL)
+                    if(corr[i] != NULL && corr[i][j] != NULL)
                         free(corr[i][j]), corr[i][j] = NULL;
                 }
                 if(corr[i] != NULL)
@@ -1283,7 +1347,7 @@ int main(int argc, char **argv) {
     if(combine != NULL) {
         for(int i = 0; i < params.peers; i++){
             for(int j = 0; j < 3; j++){
-                if(combine[i][j] != NULL)
+                if(combine[i] != NULL && combine[i][j] != NULL)
                     free(combine[i][j]), combine[i][j] = NULL;
             }
 
@@ -1299,11 +1363,11 @@ int main(int argc, char **argv) {
             for(int i = 0; i < params.peers; i++){
                 for(int j = 0; j < uncorr_vars[i]; j++){
                     for (int k = 0; k < 2; ++k) {
-                        if(subspace[i][j][k] != NULL)
+                        if(subspace[i] != NULL && subspace[i][j] != NULL && subspace[i][j][k] != NULL)
                             free(subspace[i][j][k]), subspace[i][j][k] = NULL;
                     }
 
-                    if(subspace[i][j] != NULL)
+                    if(subspace[i] != NULL && subspace[i][j] != NULL)
                         free(subspace[i][j]), subspace[i][j] = NULL;
                 }
 
@@ -1316,7 +1380,7 @@ int main(int argc, char **argv) {
         if(discardedPts != NULL) {
             for(int i = 0; i < params.peers; i++){
                 for(int j = 0; j < uncorr_vars[i]; j++){
-                    if(discardedPts[i][j] != NULL)
+                    if(discardedPts[i] != NULL && discardedPts[i][j] != NULL)
                         free(discardedPts[i][j]), discardedPts[i][j] = NULL;
                 }
 
@@ -1336,6 +1400,8 @@ int main(int argc, char **argv) {
         free(final), final = NULL;
     if(prev != NULL)
         free(prev), prev = NULL;
+    if(centroids_dist != NULL)
+        free(centroids_dist), centroids_dist = NULL;
     if(localsum != NULL)
         free(localsum), localsum = NULL;
     if(localsum_i != NULL)
@@ -1488,6 +1554,13 @@ int parseCommandLine(char **argv, int argc, Params &params) {
                 return ArgumentError(__FUNCTION__);
             }
             params.inputFilename = string(argv[i]);
+        } else if (strcmp(argv[i], "-v") == 0) {
+            i++;
+            if (i >= argc) {
+                cerr << "Missing K-Means version.\n";
+                return ArgumentError(__FUNCTION__);
+            }
+            params.inputFilename = string(argv[i]);
         } else {
             usage(argv[0]);
             return ArgumentError(__FUNCTION__);
@@ -1512,7 +1585,8 @@ void usage(char* cmd)
             << "-clst       the local convergence tolerance for distributed K-Means" << endl
             << "-pi         percentage of points in a cluster to be evaluated as inlier" << endl
             << "-ps         percentage of subspaces in which a point must be outlier to be evaluated as general outlier" << endl
-            << "-if         input filename" << endl << endl;
+            << "-if         input filename" << endl
+            << "-v          K-Means version: 0 for standard K-Means and 1 for K-Means++" << endl << endl;
 }
 
 void printUsedParameters(Params params) {
@@ -1523,6 +1597,7 @@ void printUsedParameters(Params params) {
          << "convergence clustering threshold = " << params.convClusteringThreshold  << endl
          << "percentage subspaces = " << params.percentageSubspaces  << endl
          << "k_max = " << params.k_max  << endl
+         << "K-Means version = " << params.version << endl
          << "local convergence tolerance = "<< params.convThreshold  << endl
          << "number of consecutive rounds in which a peer must locally converge = "<< params.convLimit << endl
          << "peers = " << params.peers  << endl
@@ -2105,6 +2180,125 @@ double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure
                 igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
                 structure.slice(peerID) = (structure.slice(peerID) + structure.slice(neighborID)) / 2;
                 structure.slice(neighborID) = structure.slice(peerID);
+                computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
+                dimestimate[neighborID] = dimestimate[peerID];
+            }
+
+            igraph_vector_destroy(&neighbors);
+        }
+
+        // check local convergence
+        if (params.roundsToExecute < 0) {
+            for(int peerID = 0; peerID < params.peers; peerID++){
+                if(converged[peerID])
+                    continue;
+
+                bool dimestimateconv;
+                if(prevestimate[peerID])
+                    dimestimateconv = fabs((prevestimate[peerID] - dimestimate[peerID]) / prevestimate[peerID]) < params.convThreshold;
+                else
+                    dimestimateconv = false;
+
+                if(dimestimateconv)
+                    convRounds[peerID]++;
+                else
+                    convRounds[peerID] = 0;
+
+                converged[peerID] = (convRounds[peerID] >= params.convLimit);
+                if(converged[peerID]){
+                    Numberofconverged --;
+                }
+            }
+        }
+
+        rounds++;
+        //cerr << "\r Active peers: " << Numberofconverged << " - Rounds: " << rounds << "          ";
+        params.roundsToExecute--;
+    }
+
+    ON_EXIT:
+
+    if (converged != NULL)
+        free(converged), converged = NULL;
+
+    if (convRounds != NULL)
+        free(convRounds), convRounds = NULL;
+
+    if (prevestimate != NULL)
+        free(prevestimate), prevestimate = NULL;
+
+    return dimestimate;
+}
+
+double* MaxDistCentroidConsensus(Params params, igraph_t graph, cube &structure, double *dist_vect) {
+    if (structure.is_empty()) {
+        exit(NullPointerError(__FUNCTION__));
+    }
+
+    double *dimestimate = NULL, *prevestimate = NULL;
+    bool *converged = NULL;
+    int *convRounds = NULL;
+    int Numberofconverged = params.peers;
+    int rounds = 0;
+
+    dimestimate = (double *) calloc(params.peers, sizeof(double));
+    if (!dimestimate) {
+        exit(MemoryError(__FUNCTION__));
+    }
+
+    dimestimate[0] = 1;
+
+    converged = (bool *) calloc(params.peers, sizeof(bool));
+    if (!converged) {
+        MemoryError(__FUNCTION__);
+        goto ON_EXIT;
+    }
+
+    fill_n(converged, params.peers, false);
+
+    convRounds = (int *) calloc(params.peers, sizeof(int));
+    if (!convRounds) {
+        MemoryError(__FUNCTION__);
+        goto ON_EXIT;
+    }
+
+    prevestimate = (double *) calloc(params.peers, sizeof(double));
+    if (!prevestimate) {
+        MemoryError(__FUNCTION__);
+        goto ON_EXIT;
+    }
+
+    while( (params.roundsToExecute < 0 && Numberofconverged) || params.roundsToExecute > 0){
+        memcpy(prevestimate, dimestimate, params.peers * sizeof(double));
+        for(int peerID = 0; peerID < params.peers; peerID++){
+            // check peer convergence
+            if(params.roundsToExecute < 0 && converged[peerID])
+                continue;
+
+            // determine peer neighbors
+            igraph_vector_t neighbors;
+            igraph_vector_init(&neighbors, 0);
+            igraph_neighbors(&graph, &neighbors, peerID, IGRAPH_ALL);
+            long neighborsSize = igraph_vector_size(&neighbors);
+            if(params.fanOut < neighborsSize && params.fanOut != -1){
+                // randomly sample f adjacent vertices
+                igraph_vector_shuffle(&neighbors);
+                igraph_vector_remove_section(&neighbors, params.fanOut, neighborsSize);
+            }
+
+            neighborsSize = igraph_vector_size(&neighbors);
+            for(int i = 0; i < neighborsSize; i++){
+                int neighborID = (int) VECTOR(neighbors)[i];
+                igraph_integer_t edgeID;
+                igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
+                if (dist_vect[peerID] > dist_vect[neighborID]) {
+                    structure.slice(peerID) = structure.slice(neighborID);
+                    dist_vect[peerID] = dist_vect[neighborID];
+                }
+                else {
+                    structure.slice(neighborID) = structure.slice(peerID);
+                    dist_vect[neighborID] = dist_vect[peerID];
+                }
                 computeAverage(&dimestimate[peerID], dimestimate[neighborID]);
                 dimestimate[neighborID] = dimestimate[peerID];
             }

@@ -190,6 +190,16 @@ int computeLocalCovarianceMatrix(long partitionSize, int covarMatrixDim, double 
  */
 int computePCA(double **covarianceMatrix, double **oldSpace, long partitionSize, int n_dims, double **newSpace);
 /**
+ * This function computes a single centroid for a peer according to the K-Means++ centroids initialization.
+ * @param [in] centroidToSet the index of the centroid to set.
+ * @param [in] partitionSize the number of elements managed by the peer.
+ * @param [in] data a matrix [2, partitionSize] containing the data managed by the peer.
+ * @param [in,out] actual_dist the distance of the nearest data from the chosen centroid.
+ * @param [in,out] centroids a mat structure (from Armadillo) to store the new local centroid.
+ * @return 0 if it is correct, -2 if data is NULL or centroids is empty.
+ */
+int computeLocalInitialCentroid(int centroidToSet, int partitionSize, double **data, double &actual_dist, mat &centroids);
+/**
  * This function runs the K-Means on the part of the dataset owned by a single peer. It
  * computes the local sum of the points in each cluster, the cardinality of each cluster (weights)
  * and the associated error.
