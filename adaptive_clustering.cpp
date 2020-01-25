@@ -191,8 +191,8 @@ int computeLocalAverage(double **data, int ndims, long start, long end, double *
     }
 
     double weight = 0;
-    if ((end-start)) {
-        weight = 1 / (double) (end-start+1);
+    if ((end - start)) {
+        weight = 1 / (double) (end - start + 1);
     }
     
     for (int i = start; i <= end; ++i) {
@@ -306,9 +306,9 @@ int computeLocalCovarianceMatrix(long partitionSize, int covarMatrixDim, double 
             for (int k = 0; k < partitionSize; ++k) {
                 covarianceMatrix[i][j] += space[i][k] * space[j][k];
             }
-            if (partitionSize != 0) {
-                covarianceMatrix[i][j] = covarianceMatrix[i][j] / partitionSize;
-            }
+//            if (partitionSize != 0) {
+//                covarianceMatrix[i][j] = covarianceMatrix[i][j] / partitionSize;
+//            }
             covarianceMatrix[j][i] = covarianceMatrix[i][j];
         }
     }
@@ -365,11 +365,11 @@ int computeLocalKMeans(long partitionSize, mat centroids, double **subspace, dou
         return NullPointerError(__FUNCTION__);
     }
 
-    for (int l = 0; l < centroids.n_cols; ++l) {
-        weights[l] += 1;
-        localsum[0][l] += centroids(0, l);
-        localsum[1][l] += centroids(1, l);
-    }
+//    for (int l = 0; l < centroids.n_cols; ++l) {
+//        weights[l] += 1;
+//        localsum[0][l] += centroids(0, l);
+//        localsum[1][l] += centroids(1, l);
+//    }
     
     for (int k = 0; k < partitionSize; ++k) {
         int clusterid = mindistCluster(centroids, subspace[0][k], subspace[1][k]);
