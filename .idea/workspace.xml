@@ -61,10 +61,10 @@
   <component name="PropertiesComponent">
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/../Finale/main.cpp" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../Finale++/DistributedAdaptiveClustering" />
     <property name="nodejs_package_manager_path" value="npm" />
     <property name="two.files.diff.last.used.file" value="$PROJECT_DIR$/../Finale/main.cpp" />
-    <property name="two.files.diff.last.used.folder" value="$PROJECT_DIR$/../Finale/DistributedAdaptiveClustering" />
+    <property name="two.files.diff.last.used.folder" value="$PROJECT_DIR$/../Finale++/DistributedAdaptiveClustering" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
@@ -248,6 +248,9 @@
       <workItem from="1579086564024" duration="1291000" />
       <workItem from="1579889767677" duration="182000" />
       <workItem from="1579946760908" duration="69000" />
+      <workItem from="1579976704383" duration="101000" />
+      <workItem from="1580240404292" duration="1298000" />
+      <workItem from="1580312516150" duration="5173000" />
     </task>
     <task id="LOCAL-00001" summary="Added distributed Pearson Matrix computation.">
       <created>1571165174159</created>
@@ -571,7 +574,14 @@
       <option name="project" value="LOCAL" />
       <updated>1576956404113</updated>
     </task>
-    <option name="localTasksCounter" value="47" />
+    <task id="LOCAL-00047" summary="Bug fixes.">
+      <created>1579976778599</created>
+      <option name="number" value="00047" />
+      <option name="presentableId" value="LOCAL-00047" />
+      <option name="project" value="LOCAL" />
+      <updated>1579976778599</updated>
+    </task>
+    <option name="localTasksCounter" value="48" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -594,7 +604,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Created candidate subspaces.&#10;TODO: distributed kmeans clustering" />
     <MESSAGE value="Implemente distributed kmeans clustering. TBM" />
     <MESSAGE value="Implemented distributed kmeans clustering.&#10;TODO: Distributed evaluation (elbow criterion)" />
     <MESSAGE value="Modified distributed kmeans clustering and implemented Distributed evaluation (elbow criterion). TBM" />
@@ -619,57 +628,58 @@
     <MESSAGE value="Corrections + Added communication with all neighbors (with fanOut=-1)." />
     <MESSAGE value="Corrections." />
     <MESSAGE value="Added KMeans++ implementation." />
-    <option name="LAST_COMMIT_MESSAGE" value="Added KMeans++ implementation." />
+    <MESSAGE value="Bug fixes." />
+    <option name="LAST_COMMIT_MESSAGE" value="Bug fixes." />
   </component>
   <component name="WindowStateProjectService">
-    <state x="270" y="24" key="CommitChangelistDialog2" timestamp="1576956403501">
+    <state x="270" y="24" key="CommitChangelistDialog2" timestamp="1579976777337">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state x="270" y="24" key="CommitChangelistDialog2/59.24.1307.744@59.24.1307.744" timestamp="1576956403501" />
-    <state x="158" y="96" width="1109" height="573" maximized="true" key="DiffContextDialog" timestamp="1576958335033">
+    <state x="270" y="24" key="CommitChangelistDialog2/59.24.1307.744@59.24.1307.744" timestamp="1579976777337" />
+    <state x="158" y="96" width="1109" height="573" maximized="true" key="DiffContextDialog" timestamp="1580319527826">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state x="158" y="96" width="1109" height="573" maximized="true" key="DiffContextDialog/59.24.1307.744@59.24.1307.744" timestamp="1576958335033" />
-    <state x="499" y="141" width="424" height="482" key="FileChooserDialogImpl" timestamp="1576958281915">
+    <state x="158" y="96" width="1109" height="573" maximized="true" key="DiffContextDialog/59.24.1307.744@59.24.1307.744" timestamp="1580319527826" />
+    <state x="499" y="141" width="424" height="482" key="FileChooserDialogImpl" timestamp="1580319526997">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state x="499" y="141" width="424" height="482" key="FileChooserDialogImpl/59.24.1307.744@59.24.1307.744" timestamp="1576958281915" />
-    <state width="1231" height="275" key="GridCell.Tab.0.bottom" timestamp="1579889949628">
+    <state x="499" y="141" width="424" height="482" key="FileChooserDialogImpl/59.24.1307.744@59.24.1307.744" timestamp="1580319526997" />
+    <state width="899" height="277" key="GridCell.Tab.0.bottom" timestamp="1580319672607">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1231" height="275" key="GridCell.Tab.0.bottom/59.24.1307.744@59.24.1307.744" timestamp="1579889949628" />
-    <state width="1231" height="275" key="GridCell.Tab.0.center" timestamp="1579889949628">
+    <state width="899" height="277" key="GridCell.Tab.0.bottom/59.24.1307.744@59.24.1307.744" timestamp="1580319672607" />
+    <state width="899" height="277" key="GridCell.Tab.0.center" timestamp="1580319672607">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1231" height="275" key="GridCell.Tab.0.center/59.24.1307.744@59.24.1307.744" timestamp="1579889949628" />
-    <state width="1231" height="275" key="GridCell.Tab.0.left" timestamp="1579889949627">
+    <state width="899" height="277" key="GridCell.Tab.0.center/59.24.1307.744@59.24.1307.744" timestamp="1580319672607" />
+    <state width="899" height="277" key="GridCell.Tab.0.left" timestamp="1580319672606">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1231" height="275" key="GridCell.Tab.0.left/59.24.1307.744@59.24.1307.744" timestamp="1579889949627" />
-    <state width="1231" height="275" key="GridCell.Tab.0.right" timestamp="1579889949628">
+    <state width="899" height="277" key="GridCell.Tab.0.left/59.24.1307.744@59.24.1307.744" timestamp="1580319672606" />
+    <state width="899" height="277" key="GridCell.Tab.0.right" timestamp="1580319672607">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1231" height="275" key="GridCell.Tab.0.right/59.24.1307.744@59.24.1307.744" timestamp="1579889949628" />
-    <state width="1231" height="278" key="GridCell.Tab.1.bottom" timestamp="1579087860010">
+    <state width="899" height="277" key="GridCell.Tab.0.right/59.24.1307.744@59.24.1307.744" timestamp="1580319672607" />
+    <state width="899" height="277" key="GridCell.Tab.1.bottom" timestamp="1580319672608">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1231" height="278" key="GridCell.Tab.1.bottom/59.24.1307.744@59.24.1307.744" timestamp="1579087860010" />
-    <state width="1231" height="278" key="GridCell.Tab.1.center" timestamp="1579087860010">
+    <state width="899" height="277" key="GridCell.Tab.1.bottom/59.24.1307.744@59.24.1307.744" timestamp="1580319672608" />
+    <state width="899" height="277" key="GridCell.Tab.1.center" timestamp="1580319672608">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1231" height="278" key="GridCell.Tab.1.center/59.24.1307.744@59.24.1307.744" timestamp="1579087860010" />
-    <state width="1231" height="278" key="GridCell.Tab.1.left" timestamp="1579087860010">
+    <state width="899" height="277" key="GridCell.Tab.1.center/59.24.1307.744@59.24.1307.744" timestamp="1580319672608" />
+    <state width="899" height="277" key="GridCell.Tab.1.left" timestamp="1580319672607">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1231" height="278" key="GridCell.Tab.1.left/59.24.1307.744@59.24.1307.744" timestamp="1579087860010" />
-    <state width="1231" height="278" key="GridCell.Tab.1.right" timestamp="1579087860010">
+    <state width="899" height="277" key="GridCell.Tab.1.left/59.24.1307.744@59.24.1307.744" timestamp="1580319672607" />
+    <state width="899" height="277" key="GridCell.Tab.1.right" timestamp="1580319672608">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state width="1231" height="278" key="GridCell.Tab.1.right/59.24.1307.744@59.24.1307.744" timestamp="1579087860010" />
-    <state x="312" y="119" key="Vcs.Push.Dialog.v2" timestamp="1576956422673">
+    <state width="899" height="277" key="GridCell.Tab.1.right/59.24.1307.744@59.24.1307.744" timestamp="1580319672608" />
+    <state x="312" y="119" key="Vcs.Push.Dialog.v2" timestamp="1579976786894">
       <screen x="59" y="24" width="1307" height="744" />
     </state>
-    <state x="312" y="119" key="Vcs.Push.Dialog.v2/59.24.1307.744@59.24.1307.744" timestamp="1576956422673" />
+    <state x="312" y="119" key="Vcs.Push.Dialog.v2/59.24.1307.744@59.24.1307.744" timestamp="1579976786894" />
     <state x="462" y="34" width="501" height="702" key="refactoring.ChangeSignatureDialog" timestamp="1576955683320">
       <screen x="59" y="24" width="1307" height="744" />
     </state>

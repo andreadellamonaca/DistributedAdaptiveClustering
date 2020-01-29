@@ -16,7 +16,7 @@
  */
 struct Params {
     int          peers = 10; /**< The number of peers. */
-    string       inputFilename = "../datasets/HTRU_2.csv"; /**< The path for the input CSV file. */
+    string       inputFilename = "../datasets/Iris.csv"; /**< The path for the input CSV file. */
     string       outputFilename; /**< The path for the output file. */
     double       convThreshold = 0.001; /**< The local convergence tolerance for the consensus algorithm. */
     int          convLimit = 3; /**< The number of consecutive rounds in which a peer must locally converge. */
@@ -31,7 +31,7 @@ struct Params {
     double       percentageIncircle = 0.9; /**< The percentage of points in a cluster to be considered as inliers. */
     double       percentageSubspaces = 0.8; /**< The percentage of subspace in which a point must be outlier to be
  *                                              evaluated as general outlier. */
-    int          version = 0; /**< 0 for standard K-Means and 1 for K-Means++. */
+    int          version = 1; /**< 0 for standard K-Means and 1 for K-Means++. */
 };
 
 chrono::high_resolution_clock::time_point t1, t2;
@@ -145,10 +145,11 @@ double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure
  * @param [in] structure a cube structure (from Armadillo library) [peers, 2, nCluster]
  *                          containing the information to be exchanged.
  * @param [in] dist_vect a vector containing the distance to compare the centroids to exchange.
+ * @param [in] centrID the centroid index to compare.
  * @return an array [1, peers] containing the estimate for each peer of the total number
  *          of peers (to be used for estimation of the sum of the value in structure).
  */
-double* MaxDistCentroidConsensus(Params params, igraph_t graph, cube &structure, double *dist_vect);
+double* MaxDistCentroidConsensus(Params params, igraph_t graph, cube &structure, double *dist_vect, int centrID);
 /**
  * This function merges the outliers count for all the peers. This function exits with
  * code -2 if structure is NULL and -1 for error in memory allocation.
@@ -294,7 +295,7 @@ int main(int argc, char **argv) {
     dimestimate = SingleValueAverageConsensus(params, graph, sizeEstimate);
 
     for(int peerID = 0; peerID < params.peers; peerID++){
-        sizeEstimate[peerID] = sizeEstimate[peerID] / dimestimate[peerID];
+        sizeEstimate[peerID] = std::round(sizeEstimate[peerID] / dimestimate[peerID]);
     }
 
     elapsed = StopTheClock();
@@ -850,7 +851,7 @@ int main(int argc, char **argv) {
                     }
                     else {
                         if (first_centroid >= peerLastItem[peerID - 1] + 1 && first_centroid <= peerLastItem[peerID]) {
-                            int dataID = first_centroid - peerLastItem[peerID - 1] + 1;
+                            int dataID = first_centroid - (peerLastItem[peerID - 1] + 1);
                             centroids(0, 0, peerID) = subspace[peerID][subspaceID][0][dataID];
                             centroids(1, 0, peerID) = subspace[peerID][subspaceID][1][dataID];
                             break;
@@ -872,7 +873,7 @@ int main(int argc, char **argv) {
                             goto ON_EXIT;
                         }
                     }
-                    MaxDistCentroidConsensus(params, graph, centroids, centroids_dist);
+                    MaxDistCentroidConsensus(params, graph, centroids, centroids_dist, centrToSet);
                 }
             }
             else {
@@ -968,10 +969,10 @@ int main(int argc, char **argv) {
 
                 for(int peerID = 0; peerID < params.peers; peerID++){
                     for (int clusterID = 0; clusterID < nCluster; ++clusterID) {
-                        if (weights[peerID][clusterID] != 0) {
+                        //if (weights[peerID][clusterID] != 0) {
                             centroids(0, clusterID, peerID) = localsum[peerID][0][clusterID] / weights[peerID][clusterID];
                             centroids(1, clusterID, peerID) = localsum[peerID][1][clusterID] / weights[peerID][clusterID];
-                        }
+                        //}
                     }
 
                     error[peerID] = error[peerID] / dimestimate[peerID];
@@ -2284,7 +2285,7 @@ double* CentroidsAverageConsensus(Params params, igraph_t graph, cube &structure
     return dimestimate;
 }
 
-double* MaxDistCentroidConsensus(Params params, igraph_t graph, cube &structure, double *dist_vect) {
+double* MaxDistCentroidConsensus(Params params, igraph_t graph, cube &structure, double *dist_vect, int centrID) {
     if (structure.is_empty()) {
         exit(NullPointerError(__FUNCTION__));
     }
@@ -2346,11 +2347,16 @@ double* MaxDistCentroidConsensus(Params params, igraph_t graph, cube &structure,
                 igraph_integer_t edgeID;
                 igraph_get_eid(&graph, &edgeID, peerID, neighborID, IGRAPH_UNDIRECTED, 1);
                 if (dist_vect[neighborID] > dist_vect[peerID]) {
-                    structure.slice(peerID) = structure.slice(neighborID);
+                    structure(0, centrID, peerID) = structure(0, centrID, neighborID);
+                    structure(1, centrID, peerID) = structure(1, centrID, neighborID);
+                    //structure.slice(peerID) = structure.slice(neighborID);
                     dist_vect[peerID] = dist_vect[neighborID];
                 }
                 else {
-                    structure.slice(neighborID) = structure.slice(peerID);
+                    structure(0, centrID, neighborID) = structure(0, centrID, peerID);
+                    structure(1, centrID, neighborID) = structure(1, centrID, peerID);
+
+                    //structure.slice(neighborID) = structure.slice(peerID);
                     dist_vect[neighborID] = dist_vect[peerID];
                 }
                 computeAverage(&dimestimate[peerID], dimestimate[neighborID]);

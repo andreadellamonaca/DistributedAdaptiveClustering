@@ -345,15 +345,26 @@ int computeLocalInitialCentroid(int centroidToSet, int partitionSize, double **d
         return NullPointerError(__FUNCTION__);
     }
 
-    actual_dist = 1e12;
+    actual_dist = -1.0;
     for (int dataID = 0; dataID < partitionSize; ++dataID) {
-        for (int centroidID = 0; centroidID < centroidToSet; ++centroidID) {
+        double min_dist = L2distance(centroids(0, 0), centroids(1, 0), data[0][dataID], data[1][dataID]);
+        if (min_dist == 0.0) {//the data is already a centroid
+            continue;
+        }
+        for (int centroidID = 1; centroidID < centroidToSet; ++centroidID) {
             double dist = L2distance(centroids(0, centroidID), centroids(1, centroidID), data[0][dataID], data[1][dataID]);
-            if (dist < actual_dist) {
-                actual_dist = dist;
-                centroids(0, centroidToSet) = data[0][dataID];
-                centroids(1, centroidToSet) = data[1][dataID];
+            if (dist == 0.0) {//the data is already a centroid
+                min_dist = 0.0;
+                break;
             }
+            if (dist < min_dist) {
+                min_dist = dist;
+            }
+        }
+        if (min_dist > actual_dist) {
+            centroids(0, centroidToSet) = data[0][dataID];
+            centroids(1, centroidToSet) = data[1][dataID];
+            actual_dist = min_dist;
         }
     }
 
